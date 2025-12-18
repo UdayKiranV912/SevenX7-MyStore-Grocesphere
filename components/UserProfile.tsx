@@ -89,23 +89,23 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
   const isMissingMandatory = !user.gstNumber || !user.licenseNumber;
 
   return (
-    <div className="pb-32 px-5 pt-8 space-y-8 animate-fade-in">
+    <div className="pb-32 px-5 pt-8 space-y-8 animate-fade-in flex flex-col items-center w-full">
       {isMissingMandatory && !isEditingProfile && (
-        <div className="bg-orange-50 border border-orange-200 p-5 rounded-[2rem] text-orange-800 text-xs font-bold animate-pulse flex items-center gap-3">
+        <div className="w-full bg-orange-50 border border-orange-200 p-5 rounded-[2rem] text-orange-800 text-xs font-bold animate-pulse flex items-center gap-3">
             <span className="text-xl">⚠️</span>
             <p>Verification Required: Update your GST and License details to unlock mart services.</p>
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-4 w-full text-center">
           <SevenX7Logo size="medium" />
-          <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-black text-white border-[6px] border-white shadow-xl relative overflow-hidden">
+          <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-black text-white border-[6px] border-white shadow-xl relative overflow-hidden mt-2">
               <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent"></div>
               {user.name?.charAt(0).toUpperCase() || '👤'}
           </div>
       </div>
       
-      <div className="bg-slate-50/50 p-8 rounded-[3.5rem] border border-slate-100 shadow-card">
+      <div className="w-full bg-slate-50/50 p-8 rounded-[3.5rem] border border-slate-100 shadow-card">
         {isEditingProfile ? (
             <div className="space-y-4">
                 <div className="space-y-1">
@@ -153,7 +153,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
                     {!isMissingMandatory && (
                       <button onClick={() => { setIsEditingProfile(false); setErrors({}); }} className="flex-1 py-4 bg-white text-slate-400 font-black uppercase text-[10px] rounded-2xl border border-slate-200">Cancel</button>
                     )}
-                    <button onClick={handleSaveProfile} className="flex-1 py-4 bg-slate-900 text-white font-black uppercase text-[10px] rounded-2xl shadow-lg active:scale-95 transition-all">Save Profile</button>
+                    <button onClick={handleSaveProfile} className="flex-1 py-4 bg-slate-900 text-white font-black uppercase text-[10px] rounded-2xl shadow-lg active:scale-[0.98] transition-all">Save Profile</button>
                 </div>
             </div>
         ) : (
@@ -179,7 +179,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
         )}
       </div>
 
-      <div className="bg-white rounded-[3.5rem] p-6 shadow-soft-xl border border-slate-100 overflow-hidden">
+      <div className="w-full bg-white rounded-[3.5rem] p-6 shadow-soft-xl border border-slate-100 overflow-hidden">
           <div className="flex justify-between items-center mb-6 px-3"><h4 className="font-black text-slate-900 text-sm uppercase tracking-widest">Saved Mart Address</h4>{!isEditingAddress && <button onClick={() => setIsEditingAddress(true)} className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full uppercase tracking-wider">Edit</button>}</div>
           {isEditingAddress ? (
               <div className="space-y-4">
@@ -195,11 +195,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
           )}
       </div>
 
-      <div className="pt-6 border-t border-slate-100">
+      <div className="w-full pt-6 border-t border-slate-100">
           <button onClick={onLogout} className="w-full py-5 bg-red-50 text-red-500 font-black uppercase tracking-[0.2em] text-[10px] rounded-[2rem] border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm">Sign Out Mart Account</button>
       </div>
       
-      <div className="flex justify-center pb-4 grayscale opacity-20">
+      <div className="flex justify-center pb-4 grayscale opacity-20 w-full">
           <SevenX7Logo size="xs" />
       </div>
     </div>

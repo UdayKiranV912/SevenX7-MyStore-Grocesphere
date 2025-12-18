@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface SevenX7LogoProps {
@@ -11,46 +10,71 @@ const SevenX7Logo: React.FC<SevenX7LogoProps> = ({ size = 'small', isWelcome = f
   
   const getTextSize = () => {
       switch(size) {
-          case 'xs': return 'text-[8px]';
-          case 'small': return 'text-[10px]';
-          case 'medium': return 'text-base';
-          case 'large': return 'text-3xl';
-          default: return 'text-[10px]';
+          case 'xs': return 'text-[10px]';
+          case 'small': return 'text-xs';
+          case 'medium': return 'text-xl';
+          case 'large': return 'text-4xl';
+          default: return 'text-xs';
       }
   };
 
   const isLarge = size === 'large';
   const textSizeClass = getTextSize();
   
-  // Minimal gaps to make it look like one word
-  const gapClass = 'gap-0.5';
+  // X needs to be significantly larger and bolder to act as the overlay anchor
+  const xSizeClass = isLarge ? 'text-6xl' : size === 'medium' ? 'text-3xl' : size === 'xs' ? 'text-sm' : 'text-xl';
   
-  const xSize = isLarge ? 'text-5xl' : size === 'medium' ? 'text-2xl' : size === 'xs' ? 'text-[10px]' : 'text-lg';
-  // Tight tracking for "one word" feel
-  const trackingClass = 'tracking-tighter';
+  // Precise negative margins to force the 'X' to overlay the 'n' in Seven and the '7'
+  // Using em-based or pixel-based negative margins tailored to the size
+  const getOverlapMargin = () => {
+    switch(size) {
+      case 'large': return 'mx-[-14px]';
+      case 'medium': return 'mx-[-7px]';
+      case 'xs': return 'mx-[-2px]';
+      default: return 'mx-[-4px]';
+    }
+  };
+
+  const marginClass = getOverlapMargin();
 
   return (
-    <div className={`group flex items-center justify-center font-display ${gapClass} select-none`}>
+    <div className="group flex items-center justify-center font-display select-none leading-none h-fit">
       
-      {/* SEVEN - Black, standard bold */}
+      {/* SEVEN */}
       <span 
-        className={`${textSizeClass} text-black font-black uppercase ${trackingClass} leading-none`}
+        className={`${textSizeClass} text-black font-black uppercase leading-none z-0`}
+        style={{ letterSpacing: '-0.02em' }}
       >
         Seven
       </span>
 
-      {/* X - Black, extra bold */}
-      <div className={`relative flex items-center justify-center ${xSize} leading-none`} onClick={onNewsClick}>
+      {/* X - The Overlaying Element */}
+      <div 
+        className={`relative flex items-center justify-center ${xSizeClass} leading-none ${marginClass} z-10 transition-transform group-hover:scale-110 duration-300`} 
+        onClick={onNewsClick}
+        style={{ cursor: onNewsClick ? 'pointer' : 'default' }}
+      >
          <span 
-            className="relative z-10 text-black font-black inline-block origin-center leading-none" 
-            style={{ fontFamily: 'sans-serif', fontWeight: 900 }}
+            className="text-black font-black inline-block leading-none" 
+            style={{ 
+              fontFamily: 'Inter, sans-serif', 
+              fontWeight: 1000,
+              fontSize: '1.25em',
+              // Subtle white outline (stroke) to create depth when overlaying 'n' and '7'
+              filter: 'drop-shadow(1px 0 0 white) drop-shadow(-1px 0 0 white) drop-shadow(0 1px 0 white) drop-shadow(0 -1px 0 white)'
+            }}
          >
             X
          </span>
       </div>
 
       {/* 7 */}
-      <span className={`${textSizeClass} text-black font-black uppercase ${trackingClass} leading-none`}>7</span>
+      <span 
+        className={`${textSizeClass} text-black font-black uppercase leading-none z-0`}
+        style={{ letterSpacing: '-0.02em' }}
+      >
+        7
+      </span>
 
     </div>
   );

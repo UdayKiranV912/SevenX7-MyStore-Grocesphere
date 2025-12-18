@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Store, OrderMode } from '../types';
 import { getRoute, watchLocation, clearWatch, ACCURACY_THRESHOLD } from '../services/locationService';
@@ -21,7 +20,10 @@ interface MapVisualizerProps {
   driverLocation?: { lat: number; lng: number } | null;
 }
 
-const isValidCoord = (num: any) => typeof num === 'number' && !isNaN(num);
+// Robust coordinate validation
+const isValidCoord = (num: any): num is number => {
+  return typeof num === 'number' && !isNaN(num) && isFinite(num);
+};
 
 export const MapVisualizer: React.FC<MapVisualizerProps> = ({ 
   stores, 
@@ -60,6 +62,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
     const L = (window as any).L;
     if (!L || !mapContainerRef.current || mapInstanceRef.current) return;
 
+    // Default to Bengaluru if all else fails, but ensure it's valid
     let startLat = 12.9716;
     let startLng = 77.5946;
 
@@ -70,52 +73,58 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         startLat = selectedStore.lat;
         startLng = selectedStore.lng;
     } else if (isValidCoord(finalUserLat) && isValidCoord(finalUserLng)) {
-        startLat = finalUserLat!;
-        startLng = finalUserLng!;
+        startLat = finalUserLat;
+        startLng = finalUserLng;
     }
 
-    const map = L.map(mapContainerRef.current, {
-      center: [startLat, startLng],
-      zoom: 16,
-      zoomControl: false,
-      attributionControl: false,
-      fadeAnimation: true,
-      zoomAnimation: true,
-      markerZoomAnimation: true
-    });
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20,
-      subdomains: 'abcd'
-    }).addTo(map);
-
-    markersLayerRef.current = L.layerGroup().addTo(map);
-    routeLayerRef.current = L.layerGroup().addTo(map);
-
-    map.on('dragstart', () => setIsFollowingUser(false));
-
-    if (isSelectionMode && onMapClick) {
-      map.on('move', () => {
-        const center = map.getCenter();
-        if (isValidCoord(center.lat) && isValidCoord(center.lng)) {
-            onMapClick(center.lat, center.lng);
-        }
+    try {
+      const map = L.map(mapContainerRef.current, {
+        center: [startLat, startLng],
+        zoom: 16,
+        zoomControl: false,
+        attributionControl: false,
+        fadeAnimation: true,
+        zoomAnimation: true,
+        markerZoomAnimation: true
       });
-    }
 
-    mapInstanceRef.current = map;
-    setIsMapReady(true);
-    
-    const resizeObserver = new ResizeObserver(() => map.invalidateSize());
-    resizeObserver.observe(mapContainerRef.current);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        subdomains: 'abcd'
+      }).addTo(map);
 
-    return () => {
-      resizeObserver.disconnect();
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
+      markersLayerRef.current = L.layerGroup().addTo(map);
+      routeLayerRef.current = L.layerGroup().addTo(map);
+
+      map.on('dragstart', () => setIsFollowingUser(false));
+
+      if (isSelectionMode && onMapClick) {
+        map.on('move', () => {
+          const center = map.getCenter();
+          if (isValidCoord(center.lat) && isValidCoord(center.lng)) {
+              onMapClick(center.lat, center.lng);
+          }
+        });
       }
-    };
+
+      mapInstanceRef.current = map;
+      setIsMapReady(true);
+      
+      const resizeObserver = new ResizeObserver(() => {
+        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+      });
+      resizeObserver.observe(mapContainerRef.current);
+
+      return () => {
+        resizeObserver.disconnect();
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
+      };
+    } catch (err) {
+      console.error("Leaflet initialization failed:", err);
+    }
   }, []); 
 
   // Watch Location
@@ -148,16 +157,16 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
     const L = (window as any).L;
     if (!isMapReady || !L || !mapInstanceRef.current || !isValidCoord(finalUserLat) || !isValidCoord(finalUserLng)) return;
 
-    const latLng = [finalUserLat, finalUserLng] as [number, number];
+    const latLng: [number, number] = [finalUserLat, finalUserLng];
 
     // Accuracy Circle
     if (!isSelectionMode) {
         if (accuracyCircleRef.current) {
             accuracyCircleRef.current.setLatLng(latLng);
-            accuracyCircleRef.current.setRadius(finalAccuracy);
+            accuracyCircleRef.current.setRadius(isValidCoord(finalAccuracy) ? finalAccuracy : 20);
         } else {
             accuracyCircleRef.current = L.circle(latLng, {
-                radius: finalAccuracy,
+                radius: isValidCoord(finalAccuracy) ? finalAccuracy : 20,
                 color: 'transparent',
                 fillColor: '#10b981',
                 fillOpacity: 0.1,
@@ -203,8 +212,10 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   // Sync Other Stores
   useEffect(() => {
     const L = (window as any).L;
-    if (!isMapReady || !L || isSelectionMode) return;
+    if (!isMapReady || !L || !markersLayerRef.current) return;
     markersLayerRef.current.clearLayers();
+
+    if (isSelectionMode) return;
 
     stores.forEach(store => {
        if (!isValidCoord(store.lat) || !isValidCoord(store.lng)) return;
@@ -248,7 +259,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         return;
     }
 
-    const latLng = [driverLocation.lat, driverLocation.lng] as [number, number];
+    const latLng: [number, number] = [driverLocation.lat, driverLocation.lng];
 
     if (driverMarkerRef.current) {
         driverMarkerRef.current.setLatLng(latLng);
@@ -266,7 +277,9 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   // Handle flyTo on forcedCenter changes
   useEffect(() => {
     if (isMapReady && forcedCenter && isValidCoord(forcedCenter.lat) && isValidCoord(forcedCenter.lng)) {
-        mapInstanceRef.current.flyTo([forcedCenter.lat, forcedCenter.lng], 17, { animate: true, duration: 2 });
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([forcedCenter.lat, forcedCenter.lng], 17, { animate: true, duration: 2 });
+        }
     }
   }, [forcedCenter, isMapReady]);
 
@@ -291,7 +304,12 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
       {/* Controls */}
       <div className="absolute bottom-10 right-6 z-[400] flex flex-col gap-3">
           <button 
-            onClick={() => { setIsFollowingUser(true); if(isValidCoord(finalUserLat)) mapInstanceRef.current.flyTo([finalUserLat, finalUserLng], 18); }}
+            onClick={() => { 
+                setIsFollowingUser(true); 
+                if(isValidCoord(finalUserLat) && isValidCoord(finalUserLng) && mapInstanceRef.current) {
+                    mapInstanceRef.current.flyTo([finalUserLat, finalUserLng], 18);
+                }
+            }}
             className={`w-14 h-14 bg-white/95 backdrop-blur-md rounded-[1.25rem] shadow-float flex items-center justify-center border border-white active:scale-90 transition-all ${isFollowingUser ? 'text-emerald-600 ring-2 ring-emerald-500/20' : 'text-slate-500'}`}
             title="Recenter"
           >

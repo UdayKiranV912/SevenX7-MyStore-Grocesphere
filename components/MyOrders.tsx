@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Order, Store, OrderMode } from '../types';
 import { MapVisualizer } from './MapVisualizer';
@@ -9,6 +8,10 @@ interface MyOrdersProps {
   onPayNow?: (order: Order) => void;
   userId?: string;
 }
+
+const isValidCoord = (num: any): num is number => {
+  return typeof num === 'number' && !isNaN(num) && isFinite(num);
+};
 
 export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, userId }) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,7 +30,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
     const fetchOrders = async () => {
       setLoading(true);
       try {
-        if (userId === 'demo-user') {
+        if (userId === 'demo-user' || (userId && userId.includes('demo'))) {
           // Demo Mode: Load from Local Storage
           const savedOrders = localStorage.getItem('grocesphere_orders');
           if (savedOrders) {
@@ -51,12 +54,10 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
 
     // REAL-TIME SUBSCRIPTION
     let subscription: any = null;
-    if (userId && userId !== 'demo-user') {
+    if (userId && !userId.includes('demo')) {
         subscription = subscribeToUserOrders(userId, (updatedOrderDb) => {
             setOrders(prev => prev.map(o => {
                 if (o.id === updatedOrderDb.id) {
-                    // Map DB status to App Status
-                    // Fix: Map string values to correct valid Order['status'] literals
                     let appStatus: Order['status'] = 'placed';
                     if (updatedOrderDb.status === 'packing') appStatus = 'packing';
                     if (updatedOrderDb.status === 'ready') appStatus = 'ready';
@@ -80,16 +81,14 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
 
   // Simulator for status updates (ONLY for Demo Mode)
   useEffect(() => {
-    if (userId !== 'demo-user') return;
+    if (!userId || !userId.includes('demo')) return;
 
     const interval = setInterval(() => {
       setOrders(prevOrders => {
         const updatedOrders = prevOrders.map((o): Order => {
             if (o.deliveryType === 'SCHEDULED' && o.paymentStatus === 'PENDING') return o;
-            // Fix: Use correct literal values 'cancelled', 'delivered', 'picked_up' for type safety
             if (o.status === 'cancelled' || o.status === 'delivered' || o.status === 'picked_up') return o;
 
-            // Fix: Map correct state transitions using internal literal names
             if (o.status === 'placed') return { ...o, status: 'packing' };
             if (o.status === 'packing') return { ...o, status: o.mode === 'DELIVERY' ? 'on_way' : 'ready' };
             if (o.status === 'on_way') return { ...o, status: 'delivered' };
@@ -125,9 +124,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
     );
   }
 
-  // Helper to determine status steps and progress
   const getStatusInfo = (status: string, mode: OrderMode) => {
-      // Fix: Use internal status names 'placed', 'packing', 'on_way', 'ready' etc for step matching
       const deliverySteps = ['placed', 'packing', 'on_way', 'delivered'];
       const pickupSteps = ['placed', 'packing', 'ready', 'picked_up'];
       
@@ -135,7 +132,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       const currentIndex = steps.indexOf(status);
       const progress = ((currentIndex) / (steps.length - 1)) * 100;
 
-      // Fix: Translate internal literal values to pretty human-readable labels
       const getLabel = (step: string) => {
           if (step === 'placed') return 'Placed';
           if (step === 'packing') return 'Packing';
@@ -146,7 +142,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
           return step;
       };
 
-      // Fix: Map icons based on internal literal values
       const getIcon = (step: string) => {
           if (step === 'placed') return '📝';
           if (step === 'packing') return '🥡';
@@ -160,16 +155,16 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
   };
 
   const getSimulatedDriverPos = (order: Order) => {
-      // Fix: Check for 'on_way' instead of 'On the way'
       if (order.status !== 'on_way' || !order.storeLocation || !order.userLocation) return undefined;
       
-      // Calculate progress (0 to 1) loops every 30s
-      const loopDuration = 30; // seconds
-      const offset = order.id.length; // distinct offset per order
+      if (!isValidCoord(order.storeLocation.lat) || !isValidCoord(order.storeLocation.lng) ||
+          !isValidCoord(order.userLocation.lat) || !isValidCoord(order.userLocation.lng)) return undefined;
+
+      const loopDuration = 30; 
+      const offset = order.id.length; 
       const t = (tick + offset) % loopDuration;
       const progress = t / loopDuration;
 
-      // Linear Interpolation
       const lat = order.storeLocation.lat + (order.userLocation.lat - order.storeLocation.lat) * progress;
       const lng = order.storeLocation.lng + (order.userLocation.lng - order.storeLocation.lng) * progress;
       
@@ -180,13 +175,12 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
     <div className="pb-32 px-5 space-y-6 pt-4">
       <div className="flex items-center justify-between">
          <h2 className="font-black text-slate-800 text-2xl">History</h2>
-         {userId === 'demo-user' && <span className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">Demo Mode</span>}
-         {userId !== 'demo-user' && <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded animate-pulse">● Live Updates</span>}
+         {userId?.includes('demo') && <span className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">Demo Mode</span>}
+         {userId && !userId.includes('demo') && <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded animate-pulse">● Live Updates</span>}
       </div>
       
       {orders.map((order, idx) => {
         const isExpanded = expandedOrderId === order.id;
-        // Fix: Use literal values for comparisons to match Order['status'] union type
         const isCompleted = order.status === 'delivered' || order.status === 'picked_up';
         const isCancelled = order.status === 'cancelled';
         const isPickup = order.mode === 'PICKUP';
@@ -197,16 +191,14 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         let statusColor = 'bg-blue-50 text-blue-700';
         if (isCompleted) statusColor = 'bg-green-50 text-green-700';
         if (isCancelled) statusColor = 'bg-red-50 text-red-700';
-        // Fix: Check for 'placed' instead of 'Pending'
         if (order.status === 'placed') statusColor = 'bg-yellow-50 text-yellow-700';
         if (isPaymentPending) statusColor = 'bg-orange-50 text-orange-700';
 
-        // Map store for visualization
         const mapStore: Store = {
             id: `order-store-${order.id}`,
             name: order.storeName || 'Store',
-            lat: order.storeLocation?.lat || 0,
-            lng: order.storeLocation?.lng || 0,
+            lat: isValidCoord(order.storeLocation?.lat) ? order.storeLocation!.lat : 12.9716,
+            lng: isValidCoord(order.storeLocation?.lng) ? order.storeLocation!.lng : 77.5946,
             address: '',
             rating: 0,
             distance: '',
@@ -224,7 +216,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
             style={{ animationDelay: `${idx * 100}ms` }}
             onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
           >
-            {/* Header */}
             <div className="flex justify-between items-start mb-4">
                <div>
                   <h3 className="font-black text-slate-900 text-lg leading-tight">{order.storeName}</h3>
@@ -241,26 +232,19 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                </div>
             </div>
 
-            {/* VISUAL TIMELINE */}
             {!isCancelled && !isPaymentPending && (
                  <div className="mb-6 px-2 pt-2 pb-2">
                     <div className="relative">
-                        {/* Background Line */}
                         <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 rounded-full -translate-y-1/2 z-0"></div>
-                        
-                        {/* Progress Line */}
                         <div 
                             className="absolute top-1/2 left-0 h-1 bg-brand-DEFAULT rounded-full -translate-y-1/2 z-0 transition-all duration-1000 ease-out"
                             style={{ width: `${progress}%` }}
                         ></div>
-
-                        {/* Steps */}
                         <div className="flex justify-between relative z-10 w-full">
                             {steps.map((step, i) => {
                                 const isActive = i === currentIndex;
                                 const isDone = i < currentIndex;
                                 const isFuture = i > currentIndex;
-
                                 return (
                                     <div key={step} className="flex flex-col items-center">
                                         <div 
@@ -292,18 +276,15 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                  </div>
             )}
 
-            {/* Expanded Content: Details, Map, Items... */}
             {isExpanded && (
                 <div className="mt-4 pt-4 border-t border-slate-50 animate-fade-in">
-                    
-                     {/* MAP SECTION inside Details */}
                     {!isCancelled && !isCompleted && order.storeLocation && !isPaymentPending && (
                         <div className="h-40 rounded-2xl overflow-hidden mb-6 border border-slate-100 shadow-inner relative z-0" onClick={(e) => e.stopPropagation()}>
                             <MapVisualizer
                                 stores={[mapStore]}
                                 selectedStore={mapStore}
-                                userLat={userLocation?.lat || 0}
-                                userLng={userLocation?.lng || 0}
+                                userLat={isValidCoord(userLocation?.lat) ? userLocation!.lat : 12.9716}
+                                userLng={isValidCoord(userLocation?.lng) ? userLocation!.lng : 77.5946}
                                 mode={order.mode}
                                 onSelectStore={() => {}}
                                 showRoute={true}
@@ -313,7 +294,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                             />
                         </div>
                     )}
-
                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Order Items</h4>
                     <div className="space-y-3 mb-5">
                         {order.items.map((item, i) => (
