@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { Store, Product } from '../types';
+import { Store, Product, BrandOption } from '../types';
 import { INITIAL_PRODUCTS, MOCK_STORES } from '../constants';
 
 // --- Database Types (matching SQL) ---
@@ -72,7 +72,7 @@ export const fetchStoreProducts = async (storeId: string): Promise<Product[]> =>
   try {
     const { data: inventoryData, error: invError } = await supabase
       .from('inventory')
-      .select('product_id, price, in_stock, mrp')
+      .select('product_id, price, in_stock, mrp, brand_data')
       .eq('store_id', storeId)
       .eq('in_stock', true);
 
@@ -113,10 +113,22 @@ export const fetchStoreProducts = async (storeId: string): Promise<Product[]> =>
         }
 
         if (baseProduct) {
+            // Map brand_data JSONB to brands array for the UI
+            const brands: BrandOption[] = [];
+            if (invItem.brand_data) {
+                Object.entries(invItem.brand_data).forEach(([name, details]: [string, any]) => {
+                    brands.push({
+                        name: name,
+                        price: details.price || invItem.price
+                    });
+                });
+            }
+
             return {
                 ...baseProduct,
                 price: parseFloat(invItem.price), 
                 mrp: invItem.mrp ? parseFloat(invItem.mrp) : (baseProduct.mrp || baseProduct.price),
+                brands: brands.length > 0 ? brands : baseProduct.brands
             };
         }
         return null;

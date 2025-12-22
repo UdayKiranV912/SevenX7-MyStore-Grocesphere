@@ -16,7 +16,7 @@ export interface Product {
   name: string;
   price: number; 
   mrp?: number; 
-  costPrice?: number; // New: For profit calculation
+  costPrice?: number;
   emoji: string;
   category: string;
   description?: string;
@@ -24,6 +24,8 @@ export interface Product {
   nutrition?: string;
   brands?: BrandOption[]; 
 }
+
+export type StoreType = 'Vegetables/Fruits' | 'Daily Needs / Milk Booth' | 'General Store' | 'Local Mart';
 
 export interface Store {
   id: string;
@@ -34,13 +36,13 @@ export interface Store {
   lat: number;
   lng: number;
   isOpen: boolean;
-  type: 'general' | 'produce' | 'dairy'; 
+  type: StoreType; 
   availableProductIds: string[]; 
   upiId?: string; 
   ownerId?: string; 
   openingTime?: string; 
   closingTime?: string; 
-  gstNumber?: string; // New: Mandatory field
+  gstNumber?: string;
 }
 
 export interface InventoryItem extends Product {
@@ -58,10 +60,12 @@ export interface CartItem extends Product {
   storeId: string;
   storeName: string;
   storeType: Store['type'];
+  costPrice?: number;
 }
 
 export type OrderMode = 'DELIVERY' | 'PICKUP';
 export type DeliveryType = 'INSTANT' | 'SCHEDULED';
+export type PaymentMethod = 'ONLINE' | 'DIRECT';
 
 export interface SavedCard {
   id: string;
@@ -98,6 +102,7 @@ export interface PaymentSplit {
   adminUpi?: string;
   deliveryFee: number; 
   driverUpi?: string;
+  transactionId?: string;
 }
 
 export interface Order {
@@ -107,6 +112,7 @@ export interface Order {
   total: number;
   status: 'placed' | 'accepted' | 'packing' | 'ready' | 'on_way' | 'delivered' | 'picked_up' | 'cancelled' | 'rejected';
   paymentStatus: 'PAID' | 'PENDING';
+  paymentMethod: PaymentMethod;
   paymentDeadline?: string; 
   mode: OrderMode;
   deliveryType: DeliveryType;
@@ -118,4 +124,5 @@ export interface Order {
   splits?: PaymentSplit;
   customerName?: string;
   customerPhone?: string;
+  transactionId?: string;
 }

@@ -3,23 +3,21 @@ import React, { useState } from 'react';
 import { UserState } from './types';
 import { Auth } from './components/OTPVerification';
 import { StoreApp } from './components/store/StoreApp';
-import { CustomerApp } from './components/customer/CustomerApp';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserState>({
-      isAuthenticated: true,
-      id: 'demo-user',
-      name: 'Demo Store Owner',
-      phone: '9999999999',
-      location: null, 
-      address: '',    
-      role: 'store_owner',
-      gstNumber: '29DEMO0000A1Z5',
-      licenseNumber: 'L-DEMO-777'
+      isAuthenticated: false,
+      phone: '',
+      location: null,
+      role: 'store_owner' 
   });
 
   const handleLoginSuccess = (userData: UserState) => {
-    setUser(userData);
+    setUser({
+        ...userData,
+        isAuthenticated: true,
+        role: 'store_owner' 
+    });
   };
 
   const handleStoreDemoLogin = () => {
@@ -28,34 +26,16 @@ const App: React.FC = () => {
       id: 'demo-user',
       name: 'Demo Store Owner',
       phone: '9999999999',
-      location: null, // Force live GPS
-      address: '',    // Force reverse geocode
+      location: { lat: 12.9716, lng: 77.5946 },
+      address: 'Indiranagar, Bangalore',
       role: 'store_owner',
       gstNumber: '29DEMO0000A1Z5',
       licenseNumber: 'L-DEMO-777'
     });
   };
 
-  const handleCustomerDemoLogin = () => {
-    setUser({
-      isAuthenticated: true,
-      id: 'demo-customer',
-      name: 'Rahul Customer',
-      phone: '9876543210',
-      location: null, // Force live GPS
-      address: '',    // Force reverse geocode
-      role: 'customer',
-      gstNumber: '29DEMO0000A1Z5',
-      licenseNumber: 'L-DEMO-888'
-    });
-  };
-
   const handleLogout = () => {
-    setUser({ isAuthenticated: false, phone: '', location: null });
-  };
-
-  const handleUpdateUser = (updates: Partial<UserState>) => {
-    setUser(prev => ({ ...prev, ...updates }));
+    setUser({ isAuthenticated: false, phone: '', location: null, role: 'store_owner' });
   };
 
   if (!user.isAuthenticated) {
@@ -63,18 +43,13 @@ const App: React.FC = () => {
         <Auth 
             onLoginSuccess={handleLoginSuccess} 
             onDemoLogin={handleStoreDemoLogin} 
-            onCustomerDemoLogin={handleCustomerDemoLogin}
+            onCustomerDemoLogin={() => {}} 
         />
     );
   }
 
-  // Routing based on Role
-  if (user.role === 'store_owner') {
-      return <StoreApp user={user} onLogout={handleLogout} />;
-  }
-
-  // Default to Customer App
-  return <CustomerApp user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
+  // All users (Real & Demo) enter the Merchant Portal
+  return <StoreApp user={user} onLogout={handleLogout} />;
 };
 
 export default App;

@@ -10,9 +10,10 @@ const CLOUDFLARE_WORKER_URL = ''; // e.g., 'https://your-worker.your-name.worker
 const assignInventory = (type: Store['type']): string[] => {
   const range = (start: number, end: number) => Array.from({length: end - start + 1}, (_, i) => String(start + i));
   
-  if (type === 'dairy') {
+  // Comment: Fix type comparison by using defined StoreType literals
+  if (type === 'Daily Needs / Milk Booth') {
     return range(41, 60); // Dairy IDs
-  } else if (type === 'produce') {
+  } else if (type === 'Vegetables/Fruits') {
     return range(61, 80); // Produce IDs
   } else {
     // General: Staples, Oils, Snacks, Basic Dairy/Veg, Home Care
@@ -117,13 +118,14 @@ export const findNearbyStores = async (lat: number, lng: number): Promise<Store[
       })
       .map((node: any) => {
         const tags = node.tags;
-        let type: Store['type'] = 'general';
+        // Comment: Fix initial type by using correct StoreType literal
+        let type: Store['type'] = 'General Store';
         
         // Determine type based on OSM tags
         if (tags.shop === 'greengrocer' || tags.shop === 'farm' || tags.shop === 'vegetable') {
-          type = 'produce';
+          type = 'Vegetables/Fruits';
         } else if (tags.shop === 'dairy' || tags.shop === 'milk' || (tags.name && tags.name.toLowerCase().includes('nandini'))) {
-          type = 'dairy';
+          type = 'Daily Needs / Milk Booth';
         }
 
         return {

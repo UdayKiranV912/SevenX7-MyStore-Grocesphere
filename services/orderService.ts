@@ -15,7 +15,10 @@ export const saveOrder = async (userId: string, order: Order) => {
         type: order.mode,
         delivery_address: order.deliveryAddress,
         delivery_lat: order.userLocation?.lat,
-        delivery_lng: order.userLocation?.lng
+        delivery_lng: order.userLocation?.lng,
+        transaction_id: order.transactionId,
+        payment_method: order.paymentMethod,
+        payment_status: order.paymentStatus
       })
       .select()
       .single();
@@ -34,7 +37,7 @@ export const saveOrder = async (userId: string, order: Order) => {
         .from('order_items')
         .insert(orderItemsPayload);
 
-    if (order.splits) {
+    if (order.splits && order.paymentMethod === 'ONLINE') {
         await supabase
             .from('payment_splits')
             .insert({
@@ -42,11 +45,12 @@ export const saveOrder = async (userId: string, order: Order) => {
                 store_amount: order.splits.storeAmount,
                 store_upi: order.splits.storeUpi,
                 handling_fee: order.splits.handlingFee || 0,
-                admin_upi: order.splits.adminUpi,
+                admin_upi: 'grocesphere.admin@upi', 
                 delivery_fee: order.splits.deliveryFee,
                 driver_upi: order.splits.driverUpi,
                 total_paid_by_customer: order.total,
-                is_settled: true
+                is_settled: false,
+                transaction_id: order.transactionId
             });
     }
 
@@ -72,12 +76,14 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
         items: row.items,
         total: parseFloat(row.total_amount),
         status: row.status as any,
-        paymentStatus: 'PAID',
+        paymentStatus: row.payment_status || 'PAID',
+        paymentMethod: row.payment_method || 'ONLINE',
         mode: row.type || 'DELIVERY',
         deliveryType: 'INSTANT',
-        storeName: row.stores?.name || 'Grocesphere Store',
+        storeName: row.stores?.name || 'My store Grocesphere Store',
         storeLocation: row.stores ? { lat: row.stores.lat, lng: row.stores.lng } : undefined,
-        userLocation: { lat: row.delivery_lat, lng: row.delivery_lng }
+        userLocation: { lat: row.delivery_lat, lng: row.delivery_lng },
+        transactionId: row.transaction_id
     }));
   } catch (err) {
     console.error('Supabase fetch failed:', err);

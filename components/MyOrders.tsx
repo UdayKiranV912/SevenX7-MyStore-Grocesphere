@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Order, Store, OrderMode } from '../types';
 import { MapVisualizer } from './MapVisualizer';
@@ -203,7 +204,8 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
             rating: 0,
             distance: '',
             isOpen: true,
-            type: 'general',
+            // Comment: Fix type by using correct StoreType literal
+            type: 'General Store',
             availableProductIds: []
         };
         

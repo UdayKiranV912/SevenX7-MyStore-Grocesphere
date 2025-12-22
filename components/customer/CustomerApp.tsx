@@ -133,20 +133,38 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
     });
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (txnId: string) => {
       if (!pendingOrderDetails) return;
+      
       const newOrder: Order = {
-          id: `ord-${Date.now()}`, date: new Date().toISOString(), items: cart, total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-          status: 'placed', paymentStatus: 'PAID', mode: 'DELIVERY', deliveryType: pendingOrderDetails.deliveryType, scheduledTime: pendingOrderDetails.scheduledTime,
-          deliveryAddress: currentAddress, storeName: cart[0].storeName, storeLocation: selectedStore ? { lat: selectedStore.lat, lng: selectedStore.lng } : undefined,
-          userLocation: currentLocation || undefined, splits: pendingOrderDetails.splits, customerName: user.name, customerPhone: user.phone
+          id: `ord-${Date.now()}`, 
+          date: new Date().toISOString(), 
+          items: cart, 
+          total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) + (pendingOrderDetails.splits.deliveryFee || 0),
+          status: 'placed', 
+          paymentStatus: 'PAID',
+          paymentMethod: pendingOrderDetails.paymentMethod, // Added missing property
+          mode: 'DELIVERY', 
+          deliveryType: pendingOrderDetails.deliveryType, 
+          scheduledTime: pendingOrderDetails.scheduledTime,
+          deliveryAddress: currentAddress, 
+          storeName: cart[0].storeName, 
+          storeLocation: selectedStore ? { lat: selectedStore.lat, lng: selectedStore.lng } : undefined,
+          userLocation: currentLocation || undefined, 
+          splits: { ...pendingOrderDetails.splits, transactionId: txnId },
+          customerName: user.name, 
+          customerPhone: user.phone,
+          transactionId: txnId
       };
+
       if (user.id && !user.id.includes('demo')) await saveOrder(user.id, newOrder);
       else {
           const existing = JSON.parse(localStorage.getItem('grocesphere_orders') || '[]');
           localStorage.setItem('grocesphere_orders', JSON.stringify([newOrder, ...existing]));
       }
-      setCart([]); setShowPayment(false); setActiveView('ORDERS');
+      setCart([]); 
+      setShowPayment(false); 
+      setActiveView('ORDERS');
   };
 
   return (
@@ -204,7 +222,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
                              </div>
 
                              <div className="flex items-center gap-2 overflow-x-auto pb-4 hide-scrollbar">
-                                 {[{ id: 'ALL', label: 'All Stores' }, { id: 'general', label: 'Provisions' }, { id: 'produce', label: 'Fresh' }].map((type) => (
+                                 {[{ id: 'ALL', label: 'All Stores' }, { id: 'General Store', label: 'Provisions' }, { id: 'Vegetables/Fruits', label: 'Fresh' }].map((type) => (
                                      <button key={type.id} onClick={() => setFilterType(type.id as any)} className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all whitespace-nowrap border ${filterType === type.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{type.label}</button>
                                  ))}
                              </div>
@@ -212,7 +230,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
                              <div className="space-y-4">
                                  {processedStores.map(store => (
                                      <div key={store.id} onClick={() => { setSelectedStore(store); setActiveView('STORE'); }} className="bg-slate-50 p-5 rounded-[2.5rem] border border-slate-100 flex items-center gap-5 cursor-pointer hover:bg-white hover:shadow-md transition-all active:scale-[0.98]">
-                                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl text-white shadow-md ${store.type === 'produce' ? 'bg-emerald-500' : store.type === 'dairy' ? 'bg-blue-500' : 'bg-orange-500'}`}>🏪</div>
+                                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl text-white shadow-md ${store.type === 'Vegetables/Fruits' ? 'bg-emerald-500' : store.type === 'Daily Needs / Milk Booth' ? 'bg-blue-500' : 'bg-orange-500'}`}>🏪</div>
                                          <div className="flex-1 min-w-0">
                                              <h3 className="font-black text-slate-900 text-base truncate mb-0.5">{store.name}</h3>
                                              <div className="flex items-center gap-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide">
@@ -269,7 +287,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
         </nav>
 
         {selectedProduct && <ProductDetailsModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={(p, qty, brand, price) => addToCart(p, qty, brand, price)} />}
-        {showPayment && pendingOrderDetails && <PaymentGateway amount={pendingOrderDetails.splits.storeAmount} onSuccess={handlePaymentSuccess} onCancel={() => setShowPayment(false)} isDemo={user.id?.includes('demo') || false} splits={pendingOrderDetails.splits} />}
+        {showPayment && pendingOrderDetails && <PaymentGateway amount={pendingOrderDetails.splits.storeAmount + (pendingOrderDetails.splits.deliveryFee || 0)} onSuccess={handlePaymentSuccess} onCancel={() => setShowPayment(false)} isDemo={user.id?.includes('demo') || false} splits={pendingOrderDetails.splits} />}
     </div>
   );
 };

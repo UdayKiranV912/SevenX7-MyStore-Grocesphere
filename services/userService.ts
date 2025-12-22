@@ -7,7 +7,7 @@ const MOCK_CARDS: SavedCard[] = [
     { id: 'u1', type: 'UPI', upiId: 'user@okaxis', label: 'Primary UPI' }
 ];
 
-export const registerUser = async (email: string, password: string, fullName: string, phone: string): Promise<UserState> => {
+export const registerUser = async (email: string, password: string, fullName: string, phone: string, role: UserState['role'] = 'store_owner'): Promise<UserState> => {
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -29,7 +29,7 @@ export const registerUser = async (email: string, password: string, fullName: st
             email: email,
             full_name: fullName,
             phone_number: phone,
-            role: 'customer'
+            role: 'store_owner'
         });
 
     if (profileError) console.error("Profile Error:", profileError);
@@ -43,7 +43,7 @@ export const registerUser = async (email: string, password: string, fullName: st
         address: '',
         savedCards: [],
         location: null,
-        role: 'customer'
+        role: 'store_owner'
     };
 };
 
@@ -67,9 +67,9 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         const newProfile = {
             id: authData.user.id,
             email: authData.user.email,
-            full_name: metadata?.full_name || 'User',
+            full_name: metadata?.full_name || 'Merchant',
             phone_number: metadata?.phone || '',
-            role: 'customer'
+            role: 'store_owner'
         };
         await supabase.from('profiles').upsert(newProfile);
         
@@ -82,7 +82,7 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
             address: '',
             savedCards: MOCK_CARDS,
             location: null,
-            role: 'customer'
+            role: 'store_owner'
         };
     }
 
@@ -95,16 +95,27 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         address: profileData.address || '',
         savedCards: MOCK_CARDS,
         location: null,
-        role: profileData.role as any,
+        role: 'store_owner',
         gstNumber: profileData.gst_number || '',
         licenseNumber: profileData.license_number || ''
     };
 };
 
-export const updateUserProfile = async (id: string, updates: { full_name?: string; address?: string; email?: string; phone_number?: string; gst_number?: string; license_number?: string }) => {
+export const updateUserProfile = async (id: string, updates: any) => {
+  // Comment: Map incoming generic field names to DB column names if necessary
+  const dbPayload: any = { ...updates };
+  if (updates.name) {
+      dbPayload.full_name = updates.name;
+      delete dbPayload.name;
+  }
+  if (updates.phone) {
+      dbPayload.phone_number = updates.phone;
+      delete dbPayload.phone;
+  }
+
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(dbPayload)
     .eq('id', id)
     .select()
     .single();
