@@ -195,6 +195,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         if (order.status === 'placed') statusColor = 'bg-yellow-50 text-yellow-700';
         if (isPaymentPending) statusColor = 'bg-orange-50 text-orange-700';
 
+        // Comment: Added verificationStatus to satisfy Store type definition
         const mapStore: Store = {
             id: `order-store-${order.id}`,
             name: order.storeName || 'Store',
@@ -204,9 +205,9 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
             rating: 0,
             distance: '',
             isOpen: true,
-            // Comment: Fix type by using correct StoreType literal
             type: 'General Store',
-            availableProductIds: []
+            availableProductIds: [],
+            verificationStatus: 'verified'
         };
         
         const driverPos = getSimulatedDriverPos(order);

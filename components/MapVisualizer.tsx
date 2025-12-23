@@ -45,7 +45,6 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   const mapInstanceRef = useRef<any>(null);
   const accuracyCircleRef = useRef<any>(null);
   const markersLayerRef = useRef<any>(null);
-  const routeLayerRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
 
   const [isMapReady, setIsMapReady] = useState(false);
@@ -79,10 +78,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         center: [startLat, startLng],
         zoom: 17,
         zoomControl: false,
-        attributionControl: false,
-        fadeAnimation: true,
-        zoomAnimation: true,
-        markerZoomAnimation: true
+        attributionControl: false
       });
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -91,8 +87,6 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
       }).addTo(map);
 
       markersLayerRef.current = L.layerGroup().addTo(map);
-      routeLayerRef.current = L.layerGroup().addTo(map);
-
       map.on('dragstart', () => setIsFollowingUser(false));
 
       mapInstanceRef.current = map;
@@ -105,25 +99,17 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
 
       return () => {
         resizeObserver.disconnect();
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.remove();
-          mapInstanceRef.current = null;
-        }
+        if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
       };
-    } catch (err) {
-      console.error("Leaflet initialization failed:", err);
-    }
+    } catch (err) { console.error("Map Error:", err); }
   }, []); 
 
   useEffect(() => {
     if (!enableLiveTracking || isSelectionMode) return;
-    const watchId = watchLocation(
-      (loc) => {
+    const watchId = watchLocation((loc) => {
         if (!isValidCoord(loc.lat) || !isValidCoord(loc.lng)) return;
         setInternalUserLoc({ lat: loc.lat, lng: loc.lng, acc: loc.accuracy });
-      },
-      () => {}
-    );
+    }, () => {});
     return () => clearWatch(watchId);
   }, [enableLiveTracking, isSelectionMode]);
 
@@ -147,28 +133,15 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         }).addTo(mapInstanceRef.current);
     }
 
-    const userIconHtml = `
-      <div class="relative flex items-center justify-center">
-        <div class="absolute w-8 h-8 bg-emerald-500/30 rounded-full animate-ping"></div>
-        <div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg relative z-10"></div>
-      </div>
-    `;
+    const userIconHtml = `<div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div>`;
 
-    if (userMarkerRef.current) {
-        userMarkerRef.current.setLatLng(latLng);
-    } else {
-        const icon = L.divIcon({
-          className: 'bg-transparent border-none',
-          html: userIconHtml,
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
-        });
+    if (userMarkerRef.current) { userMarkerRef.current.setLatLng(latLng); } 
+    else {
+        const icon = L.divIcon({ className: 'bg-transparent border-none', html: userIconHtml, iconSize: [16, 16] });
         userMarkerRef.current = L.marker(latLng, { icon, zIndexOffset: 2000 }).addTo(mapInstanceRef.current);
     }
 
-    if (!isSelectionMode && isFollowingUser) {
-       mapInstanceRef.current.panTo(latLng, { animate: true, duration: 1 });
-    }
+    if (!isSelectionMode && isFollowingUser) { mapInstanceRef.current.panTo(latLng); }
   }, [finalUserLat, finalUserLng, finalAccuracy, isMapReady, isSelectionMode, isFollowingUser]);
 
   useEffect(() => {
@@ -180,11 +153,13 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
        if (!isValidCoord(store.lat) || !isValidCoord(store.lng)) return;
        const isSelected = selectedStore?.id === store.id;
        const color = store.type === 'Vegetables/Fruits' ? '#10b981' : store.type === 'Daily Needs / Milk Booth' ? '#3b82f6' : '#f59e0b';
-       const size = isSelected ? 36 : 30; 
+       const emoji = store.type === 'Vegetables/Fruits' ? '🥦' : store.type === 'Daily Needs / Milk Booth' ? '🥛' : '🏪';
+       const size = isSelected ? 42 : 32; 
+       
        const iconHtml = `
           <div class="relative flex flex-col items-center">
-            <div class="store-pin shadow-md" style="background: ${color}; width: ${size}px; height: ${size}px; border-radius: 50% 50% 50% 6px; transform: rotate(-45deg); border: 2px solid white; display: flex; align-items: center; justify-content: center;">
-                <div style="transform: rotate(45deg); font-size: ${size * 0.4}px;">🏪</div>
+            <div class="shadow-xl" style="background: ${color}; width: ${size}px; height: ${size}px; border-radius: 50% 50% 50% 6px; transform: rotate(-45deg); border: 2px solid white; display: flex; align-items: center; justify-content: center;">
+                <div style="transform: rotate(45deg); font-size: ${size * 0.5}px;">${emoji}</div>
             </div>
           </div>
        `;
@@ -197,15 +172,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
     <div className={`w-full bg-slate-100 relative overflow-hidden isolate ${className}`}>
       <div ref={mapContainerRef} className="w-full h-full z-0" />
       <div className="absolute bottom-4 right-4 z-[400]">
-          <button 
-            onClick={() => { 
-                setIsFollowingUser(true); 
-                if(isValidCoord(finalUserLat) && isValidCoord(finalUserLng) && mapInstanceRef.current) {
-                    mapInstanceRef.current.flyTo([finalUserLat, finalUserLng], 18);
-                }
-            }}
-            className={`w-9 h-9 bg-white/95 backdrop-blur-md rounded-lg shadow-float flex items-center justify-center border border-white active:scale-90 transition-all ${isFollowingUser ? 'text-emerald-600 ring-2 ring-emerald-500/10' : 'text-slate-400'}`}
-          >
+          <button onClick={() => setIsFollowingUser(true)} className="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-slate-400 active:text-emerald-500 border border-slate-100 transition-all">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
           </button>
       </div>

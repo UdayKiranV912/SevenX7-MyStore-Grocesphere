@@ -32,6 +32,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
     address: user.address || '',
     type: 'Local Mart' as StoreType,
     gstNumber: '',
+    upiId: user.upiId || '',
+    bankName: user.bankDetails?.bankName || '',
+    accNo: user.bankDetails?.accountNumber || '',
+    ifsc: user.bankDetails?.ifscCode || '',
     lat: 12.9716,
     lng: 77.5946
   });
@@ -47,6 +51,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
                       address: store.address,
                       type: store.type as StoreType,
                       gstNumber: store.gstNumber || '',
+                      upiId: store.upiId || '',
+                      bankName: store.bankDetails?.bankName || '',
+                      accNo: store.bankDetails?.accountNumber || '',
+                      ifsc: store.bankDetails?.ifscCode || '',
                       lat: store.lat,
                       lng: store.lng
                   }));
@@ -73,6 +81,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
             address: formData.address,
             type: formData.type,
             gstNumber: formData.gstNumber,
+            upiId: formData.upiId,
+            bankDetails: {
+                bankName: formData.bankName,
+                accountNumber: formData.accNo,
+                ifscCode: formData.ifsc,
+                accountHolder: formData.ownerName
+            },
             lat: formData.lat,
             lng: formData.lng
           });
@@ -82,7 +97,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
         name: formData.ownerName, 
         email: formData.email, 
         phone: formData.phone,
-        address: formData.address
+        address: formData.address,
+        upiId: formData.upiId,
+        bankDetails: {
+            bankName: formData.bankName,
+            accountNumber: formData.accNo,
+            ifscCode: formData.ifsc,
+            accountHolder: formData.ownerName
+        }
       });
       
       setIsEditing(false);
@@ -97,92 +119,73 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
     <div className="pb-32 px-5 pt-8 space-y-8 animate-fade-in flex flex-col items-center w-full">
       <div className="flex flex-col items-center gap-4 w-full text-center">
           <SevenX7Logo size="medium" />
-          <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center text-3xl font-black text-white border-[6px] border-white shadow-xl relative mt-2 overflow-hidden">
+          <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center text-2xl font-black text-white border-[4px] border-white shadow-xl relative mt-2 overflow-hidden">
               {formData.ownerName?.charAt(0).toUpperCase() || '👤'}
           </div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">{formData.storeName || 'My Mart'}</h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest -mt-2">Merchant Dashboard Profile</p>
+          <div className="space-y-1">
+             <h2 className="text-xl font-black text-slate-900 tracking-tight">{formData.storeName || 'My Mart'}</h2>
+             {storeData?.verificationStatus === 'verified' ? (
+                <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Verified Account ✓</span>
+             ) : (
+                <span className="bg-orange-100 text-orange-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Pending Admin Approval</span>
+             )}
+          </div>
       </div>
       
-      <div className="w-full bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-soft-xl">
+      <div className="w-full bg-white p-8 rounded-[3rem] border border-slate-100 shadow-soft-xl">
         <div className="flex justify-between items-center mb-10">
-            <h4 className="font-black text-slate-900 text-sm uppercase tracking-widest">Business Identity</h4>
+            <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.2em]">Business Terminal</h4>
             {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-5 py-2.5 rounded-full uppercase tracking-widest border border-emerald-100 shadow-sm">
-                    Edit Profile
+                <button onClick={() => setIsEditing(true)} className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl uppercase tracking-widest border border-emerald-100 shadow-sm">
+                    Edit
                 </button>
             )}
         </div>
 
         {isEditing ? (
             <div className="space-y-6">
-                <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Store / Mart Name</label>
-                    <input value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full bg-slate-50 p-5 rounded-[2rem] font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Mart Name" />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Store Category</label>
-                    <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as StoreType})} className="w-full bg-slate-50 p-5 rounded-[2rem] font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500">
+                <div className="space-y-4">
+                   <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest border-b pb-1">Basic Info</p>
+                   <input value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Mart Name" />
+                   <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as StoreType})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none">
                         {STORE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">GST Number</label>
-                    <input value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} className="w-full bg-slate-50 p-5 rounded-[2rem] font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="GSTIN" />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Owner Full Name</label>
-                    <input value={formData.ownerName} onChange={e => setFormData({...formData, ownerName: e.target.value})} className="w-full bg-slate-50 p-5 rounded-[2rem] font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Owner Name" />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Mart Location</label>
-                    <AddressAutocomplete 
-                        value={formData.address} 
-                        onChange={(val) => setFormData({...formData, address: val})}
-                        onSelect={(lat, lng, addr) => setFormData({...formData, address: addr, lat, lng})}
-                        placeholder="Search for store address..."
-                    />
-                </div>
-                <div className="grid grid-cols-1 gap-5 pt-2">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Contact Phone</label>
-                        <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-slate-50 p-5 rounded-[2rem] font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Phone Number" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Business Email</label>
-                        <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-slate-50 p-5 rounded-[2rem] font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Email Address" />
-                    </div>
+
+                <div className="space-y-4">
+                   <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest border-b pb-1">Financial Details (KYC)</p>
+                   <input value={formData.upiId} onChange={e => setFormData({...formData, upiId: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="UPI ID (e.g. owner@okaxis)" />
+                   <div className="grid grid-cols-2 gap-2">
+                       <input value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="Bank Name" />
+                       <input value={formData.ifsc} onChange={e => setFormData({...formData, ifsc: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="IFSC Code" />
+                   </div>
+                   <input value={formData.accNo} onChange={e => setFormData({...formData, accNo: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="Account Number" />
                 </div>
                 
                 <div className="flex gap-4 pt-6">
-                    <button onClick={handleSave} disabled={loading} className="flex-1 py-5 bg-slate-900 text-white font-black uppercase tracking-widest text-[11px] rounded-[2rem] shadow-2xl active:scale-95 transition-all">
-                        {loading ? 'Saving...' : 'Update Details'}
+                    <button onClick={handleSave} disabled={loading} className="flex-1 py-5 bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] rounded-[2rem] shadow-2xl active:scale-95 transition-all">
+                        {loading ? 'Processing...' : 'Save Updates'}
                     </button>
-                    <button onClick={() => setIsEditing(false)} className="px-8 py-5 bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[11px] rounded-[2rem]">Cancel</button>
+                    <button onClick={() => setIsEditing(false)} className="px-6 py-5 bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[10px] rounded-[2rem]">Back</button>
                 </div>
             </div>
         ) : (
             <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-5">
-                    <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Store Category</p>
-                        <p className="font-bold text-slate-800 text-sm leading-relaxed">{formData.type}</p>
+                <div className="grid grid-cols-1 gap-4">
+                    <div className="bg-slate-50/50 p-5 rounded-[2rem] border border-slate-50">
+                        <p className="text-[8px] font-black text-slate-300 uppercase mb-2 tracking-widest">Active UPI Settlement</p>
+                        <p className="font-bold text-slate-800 text-sm tracking-tight">{formData.upiId || 'Not Set'}</p>
                     </div>
-                    <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">GST Number</p>
-                        <p className="font-bold text-slate-800 text-sm leading-relaxed">{formData.gstNumber || 'Not Registered'}</p>
+                    <div className="bg-slate-50/50 p-5 rounded-[2rem] border border-slate-50">
+                        <p className="text-[8px] font-black text-slate-300 uppercase mb-2 tracking-widest">Bank Beneficiary</p>
+                        <p className="font-bold text-slate-800 text-[10px] leading-relaxed">
+                           {formData.bankName} • {formData.ifsc}<br/>
+                           Acc: {formData.accNo}
+                        </p>
                     </div>
-                    <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Store Address</p>
-                        <p className="font-bold text-slate-800 text-sm leading-relaxed">{formData.address || 'Address not set.'}</p>
-                    </div>
-                    <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Administrator</p>
-                        <p className="font-bold text-slate-800 text-sm leading-relaxed">{formData.ownerName}</p>
-                    </div>
-                    <div className="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-50 shadow-inner">
-                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Contact Phone</p>
-                        <p className="font-bold text-slate-800 text-sm leading-relaxed">{formData.phone}</p>
+                    <div className="bg-slate-50/50 p-5 rounded-[2rem] border border-slate-50">
+                        <p className="text-[8px] font-black text-slate-300 uppercase mb-2 tracking-widest">Store Address</p>
+                        <p className="font-bold text-slate-800 text-[10px] leading-relaxed">{formData.address}</p>
                     </div>
                 </div>
             </div>
@@ -190,7 +193,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
       </div>
 
       <div className="w-full pt-6 border-t border-slate-100">
-          <button onClick={onLogout} className="w-full py-6 bg-red-50 text-red-500 font-black uppercase tracking-[0.4em] text-[11px] rounded-[2.5rem] border border-red-100 active:bg-red-500 active:text-white transition-all shadow-sm">Sign Out Mart Session</button>
+          <button onClick={onLogout} className="w-full py-6 bg-red-50 text-red-500 font-black uppercase tracking-[0.4em] text-[10px] rounded-[2.5rem] border border-red-100 active:bg-red-500 active:text-white transition-all shadow-sm">Terminate Session</button>
       </div>
     </div>
   );

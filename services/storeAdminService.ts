@@ -1,31 +1,32 @@
 
 import { supabase } from './supabaseClient';
-import { Store, Order, InventoryItem, BrandInventoryInfo } from '../types';
+import { Store, Order, InventoryItem, BrandInventoryInfo, Settlement } from '../types';
 import { INITIAL_PRODUCTS } from '../constants';
 
 const DEMO_STORE_KEY = 'grocesphere_demo_store';
 const DEMO_INVENTORY_KEY = 'grocesphere_demo_inventory';
 const DEMO_ORDERS_KEY = 'grocesphere_orders';
+const DEMO_SETTLEMENTS_KEY = 'grocesphere_settlements';
 
 export const getMyStore = async (ownerId: string): Promise<Store | null> => {
-  if (ownerId === 'demo-user') {
+  if (ownerId === 'demo-user' || ownerId.includes('demo')) {
     const saved = localStorage.getItem(DEMO_STORE_KEY);
     if (saved) return JSON.parse(saved);
     
     const defaultStore: Store = {
       id: 'demo-store-id',
-      name: 'My store Grocesphere Demo Mart',
+      name: 'Grocesphere Demo Mart',
       address: 'Indiranagar, Bengaluru',
       rating: 4.9,
       distance: '0 km',
       lat: 12.9716, 
-      lng: 77.5946,
+      lng: 77.6410,
       isOpen: true,
       type: 'Local Mart',
       availableProductIds: INITIAL_PRODUCTS.slice(0, 30).map(p => p.id),
-      upiId: 'demo@upi',
-      ownerId: 'demo-user',
-      gstNumber: '29DEMO0000A1Z5'
+      upiId: 'merchant@upi',
+      ownerId: ownerId,
+      verificationStatus: 'verified'
     };
     localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(defaultStore));
     return defaultStore;
@@ -53,40 +54,39 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
       availableProductIds: [],
       upiId: data.upi_id,
       ownerId: data.owner_id,
-      gstNumber: data.gst_number || ''
+      gstNumber: data.gst_number || '',
+      bankDetails: data.bank_details,
+      verificationStatus: data.verification_status || 'verified'
     };
   } catch (e) {
     return null;
   }
 };
 
-/**
- * Updates store profile information in both Demo (local) and Production (DB) environments.
- */
 export const updateStoreProfile = async (storeId: string, updates: Partial<Store>) => {
-  if (storeId === 'demo-store-id') {
-    const saved = localStorage.getItem(DEMO_STORE_KEY);
-    if (saved) {
-      const store = JSON.parse(saved);
-      const updated = { ...store, ...updates };
-      localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(updated));
+    if (storeId === 'demo-store-id') {
+        const saved = localStorage.getItem(DEMO_STORE_KEY);
+        if (saved) {
+            const store = JSON.parse(saved);
+            const updated = { ...store, ...updates };
+            localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(updated));
+        }
+        return;
     }
-    return;
-  }
-  
-  const dbPayload: any = { 
-    name: updates.name,
-    address: updates.address,
-    type: updates.type,
-    gst_number: updates.gstNumber,
-    lat: updates.lat,
-    lng: updates.lng,
-    is_open: updates.isOpen,
-    upi_id: updates.upiId
-  };
-  
-  const { error } = await supabase.from('stores').update(dbPayload).eq('id', storeId);
-  if (error) throw error;
+    
+    const dbPayload: any = {
+        name: updates.name,
+        address: updates.address,
+        type: updates.type,
+        gst_number: updates.gstNumber,
+        upi_id: updates.upiId,
+        bank_details: updates.bankDetails,
+        lat: updates.lat,
+        lng: updates.lng
+    };
+
+    const { error } = await supabase.from('stores').update(dbPayload).eq('id', storeId);
+    if (error) throw error;
 };
 
 export const getStoreInventory = async (storeId: string): Promise<InventoryItem[]> => {
@@ -96,12 +96,12 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
 
       const defaultInv = INITIAL_PRODUCTS.map((p, idx) => ({
           ...p,
-          inStock: idx < 30,
-          stock: idx < 30 ? 50 : 0,
+          inStock: idx < 40,
+          stock: idx < 40 ? 100 : 0,
           storePrice: p.price,
           costPrice: Math.floor(p.price * 0.8),
           mrp: p.mrp || Math.floor(p.price * 1.2),
-          isActive: idx < 30 
+          isActive: true
       }));
       localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(defaultInv));
       return defaultInv;
@@ -115,8 +115,6 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
       inStock: dbItem ? dbItem.in_stock : false,
       stock: dbItem ? (dbItem.stock || 0) : 0,
       storePrice: dbItem ? parseFloat(dbItem.price) : catalogItem.price,
-      costPrice: dbItem ? parseFloat(dbItem.cost_price || dbItem.price * 0.8) : catalogItem.price * 0.8,
-      mrp: dbItem?.mrp ? parseFloat(dbItem.mrp) : catalogItem.mrp || catalogItem.price,
       isActive: !!dbItem,
       brandDetails: dbItem?.brand_data || {} 
     };
@@ -124,70 +122,72 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
   return catalogInventory;
 };
 
-export const updateInventoryItem = async (storeId: string, productId: string, price: number, inStock: boolean, stock: number, brandDetails?: Record<string, BrandInventoryInfo>, mrp?: number, costPrice?: number) => {
-  if (storeId === 'demo-store-id') {
-    const inv = await getStoreInventory(storeId);
-    const updated = inv.map(i => i.id === productId ? { ...i, storePrice: price, inStock, stock, mrp: mrp || i.mrp || price, costPrice: costPrice || i.costPrice, isActive: true } : i);
-    localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(updated));
-    return;
-  }
-  await supabase.from('inventory').upsert({ store_id: storeId, product_id: productId, price: price, cost_price: costPrice, in_stock: inStock, stock: stock, mrp: mrp || price, brand_data: brandDetails }, { onConflict: 'store_id, product_id' });
-};
-
 export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
   if (storeId === 'demo-store-id') {
       const saved = localStorage.getItem(DEMO_ORDERS_KEY);
       if (saved) return JSON.parse(saved);
 
-      const demoOrders: Order[] = [
-          {
-              id: 'demo-order-1',
-              date: new Date().toISOString(),
-              items: [{ ...INITIAL_PRODUCTS[0], quantity: 2, originalProductId: INITIAL_PRODUCTS[0].id, storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'General Store', selectedBrand: 'Generic', price: 60 }],
-              total: 120,
-              status: 'placed',
-              paymentStatus: 'PAID',
-              paymentMethod: 'ONLINE',
-              mode: 'DELIVERY',
-              deliveryType: 'INSTANT',
-              storeName: 'Demo Mart',
-              customerName: 'Rahul Sharma'
-          },
-          {
-              id: 'demo-order-2',
-              date: new Date().toISOString(),
-              items: [{ ...INITIAL_PRODUCTS[5], quantity: 1, originalProductId: INITIAL_PRODUCTS[5].id, storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'General Store', selectedBrand: 'Generic', price: 40 }],
-              total: 40,
-              status: 'placed',
-              paymentStatus: 'PENDING',
-              paymentMethod: 'DIRECT',
-              mode: 'PICKUP',
-              deliveryType: 'INSTANT',
-              storeName: 'Demo Mart',
-              customerName: 'Priya Kapoor'
-          }
-      ];
-      localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(demoOrders));
-      return demoOrders;
+      // Generate realistic mock orders for the last 7 days for the chart
+      const mockOrders: Order[] = [];
+      const customers = ['Priya Kapoor', 'Amit Verma', 'Rahul Sen', 'Sonia Nair', 'Vikram Rao'];
+      
+      for(let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        
+        // Random number of orders per day (1-3)
+        const dailyCount = Math.floor(Math.random() * 3) + 1;
+        
+        for(let j = 0; j < dailyCount; j++) {
+            mockOrders.push({
+                id: `demo-ord-${i}-${j}`,
+                date: date.toISOString(),
+                items: [
+                    { ...INITIAL_PRODUCTS[Math.floor(Math.random() * 10)], quantity: 2, selectedBrand: 'Generic', originalProductId: '1', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }
+                ],
+                total: 500 + Math.floor(Math.random() * 2000),
+                status: i === 0 ? 'placed' : 'delivered',
+                paymentStatus: 'PAID',
+                paymentMethod: 'ONLINE',
+                mode: 'DELIVERY',
+                deliveryType: 'INSTANT',
+                storeName: 'Grocesphere Demo Mart',
+                customerName: customers[Math.floor(Math.random() * customers.length)]
+            });
+        }
+      }
+
+      localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(mockOrders));
+      return mockOrders;
   }
 
   const { data: orders } = await supabase.from('orders').select('*, profiles(full_name, phone_number)').eq('store_id', storeId).order('created_at', { ascending: false });
   return (orders || []).map((row: any) => ({
-    id: row.id, date: row.created_at, items: row.items, total: parseFloat(row.total_amount), status: row.status as any, paymentStatus: row.payment_status || 'PAID', paymentMethod: row.payment_method || 'ONLINE', mode: row.type || 'DELIVERY', deliveryType: 'INSTANT', storeName: 'My store Grocesphere Mart', deliveryAddress: row.delivery_address, customerName: row.profiles?.full_name || 'Customer'
+    id: row.id, date: row.created_at, items: row.items, total: parseFloat(row.total_amount), status: row.status as any, paymentStatus: row.payment_status || 'PAID', paymentMethod: row.payment_method || 'ONLINE', mode: row.type || 'DELIVERY', deliveryType: 'INSTANT', storeName: 'Partner Hub', customerName: row.profiles?.full_name || 'Customer'
   }));
 };
 
 export const updateStoreOrderStatus = async (orderId: string, status: Order['status']) => {
     if (orderId.startsWith('demo-')) {
-        const stored = localStorage.getItem(DEMO_ORDERS_KEY);
-        if (stored) {
-            const list = JSON.parse(stored);
-            const updated = list.map((o: any) => o.id === orderId ? { ...o, status } : o);
+        const saved = localStorage.getItem(DEMO_ORDERS_KEY);
+        if (saved) {
+            const orders = JSON.parse(saved);
+            const updated = orders.map((o: any) => o.id === orderId ? { ...o, status } : o);
             localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(updated));
         }
         return;
     }
     await supabase.from('orders').update({ status }).eq('id', orderId);
+};
+
+export const updateInventoryItem = async (storeId: string, productId: string, price: number, inStock: boolean, stock: number, brandDetails?: Record<string, BrandInventoryInfo>, mrp?: number, costPrice?: number) => {
+  if (storeId === 'demo-store-id') {
+    const inv = await getStoreInventory(storeId);
+    const updated = inv.map(i => i.id === productId ? { ...i, storePrice: price, inStock, stock, isActive: true } : i);
+    localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(updated));
+    return;
+  }
+  await supabase.from('inventory').upsert({ store_id: storeId, product_id: productId, price, in_stock: inStock, stock, brand_data: brandDetails }, { onConflict: 'store_id, product_id' });
 };
 
 export const createCustomProduct = async (storeId: string, product: InventoryItem) => {
@@ -198,4 +198,51 @@ export const createCustomProduct = async (storeId: string, product: InventoryIte
     }
     await supabase.from('products').upsert({ id: product.id, name: product.name, category: product.category, emoji: product.emoji, mrp: product.mrp || product.price });
     await updateInventoryItem(storeId, product.id, product.storePrice, product.inStock, product.stock, product.brandDetails, product.mrp, product.costPrice);
+};
+
+export const getSettlements = async (storeId: string): Promise<Settlement[]> => {
+    if (storeId === 'demo-store-id') {
+        const saved = localStorage.getItem(DEMO_SETTLEMENTS_KEY);
+        if (saved) return JSON.parse(saved);
+
+        const mockSettlements: Settlement[] = [
+            {
+                id: 'STL-1001',
+                orderId: 'demo-ord-1',
+                amount: 1450.00,
+                fromUpi: 'grocesphere.admin@upi',
+                transactionId: 'TXN-ABC-123456',
+                date: new Date().toISOString(),
+                status: 'COMPLETED'
+            },
+            {
+                id: 'STL-1002',
+                orderId: 'demo-ord-2',
+                amount: 890.50,
+                fromUpi: 'grocesphere.admin@upi',
+                transactionId: 'TXN-XYZ-987654',
+                date: new Date(Date.now() - 86400000).toISOString(),
+                status: 'COMPLETED'
+            }
+        ];
+        localStorage.setItem(DEMO_SETTLEMENTS_KEY, JSON.stringify(mockSettlements));
+        return mockSettlements;
+    }
+
+    // In a real app, this would query a settlements table populated by the admin app
+    const { data: dbSettlements } = await supabase
+        .from('settlements')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false });
+
+    return (dbSettlements || []).map((row: any) => ({
+        id: row.id,
+        orderId: row.order_id,
+        amount: parseFloat(row.amount),
+        fromUpi: row.admin_upi || 'grocesphere.admin@upi',
+        transactionId: row.transaction_id,
+        date: row.created_at,
+        status: row.status
+    }));
 };

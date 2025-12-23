@@ -27,6 +27,13 @@ export interface Product {
 
 export type StoreType = 'Vegetables/Fruits' | 'Daily Needs / Milk Booth' | 'General Store' | 'Local Mart';
 
+export interface BankDetails {
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+  accountHolder: string;
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -43,6 +50,8 @@ export interface Store {
   openingTime?: string; 
   closingTime?: string; 
   gstNumber?: string;
+  bankDetails?: BankDetails;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
 }
 
 export interface InventoryItem extends Product {
@@ -88,6 +97,8 @@ export interface UserState {
   verificationStatus?: 'pending' | 'verified' | 'rejected';
   gstNumber?: string;
   licenseNumber?: string;
+  upiId?: string;
+  bankDetails?: BankDetails;
 }
 
 export interface LocationResult {
@@ -125,4 +136,14 @@ export interface Order {
   customerName?: string;
   customerPhone?: string;
   transactionId?: string;
+}
+
+export interface Settlement {
+  id: string;
+  orderId: string;
+  amount: number;
+  fromUpi: string;
+  transactionId: string;
+  date: string;
+  status: 'COMPLETED' | 'PENDING' | 'FAILED';
 }
