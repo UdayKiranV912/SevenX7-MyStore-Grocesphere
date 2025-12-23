@@ -56,7 +56,7 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
       ownerId: data.owner_id,
       gstNumber: data.gst_number || '',
       bankDetails: data.bank_details,
-      verificationStatus: data.verification_status || 'verified'
+      verificationStatus: data.is_verified ? 'verified' : 'pending' // Aligned with SQL is_verified column
     };
   } catch (e) {
     return null;
@@ -127,17 +127,13 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
       const saved = localStorage.getItem(DEMO_ORDERS_KEY);
       if (saved) return JSON.parse(saved);
 
-      // Generate realistic mock orders for the last 7 days for the chart
       const mockOrders: Order[] = [];
       const customers = ['Priya Kapoor', 'Amit Verma', 'Rahul Sen', 'Sonia Nair', 'Vikram Rao'];
       
       for(let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() - i);
-        
-        // Random number of orders per day (1-3)
         const dailyCount = Math.floor(Math.random() * 3) + 1;
-        
         for(let j = 0; j < dailyCount; j++) {
             mockOrders.push({
                 id: `demo-ord-${i}-${j}`,
@@ -214,35 +210,25 @@ export const getSettlements = async (storeId: string): Promise<Settlement[]> => 
                 transactionId: 'TXN-ABC-123456',
                 date: new Date().toISOString(),
                 status: 'COMPLETED'
-            },
-            {
-                id: 'STL-1002',
-                orderId: 'demo-ord-2',
-                amount: 890.50,
-                fromUpi: 'grocesphere.admin@upi',
-                transactionId: 'TXN-XYZ-987654',
-                date: new Date(Date.now() - 86400000).toISOString(),
-                status: 'COMPLETED'
             }
         ];
         localStorage.setItem(DEMO_SETTLEMENTS_KEY, JSON.stringify(mockSettlements));
         return mockSettlements;
     }
 
-    // In a real app, this would query a settlements table populated by the admin app
-    const { data: dbSettlements } = await supabase
-        .from('settlements')
+    // Query payment_splits as defined in SQL logic (RLS handles store visibility)
+    const { data: dbSplits } = await supabase
+        .from('payment_splits')
         .select('*')
-        .eq('store_id', storeId)
         .order('created_at', { ascending: false });
 
-    return (dbSettlements || []).map((row: any) => ({
-        id: row.id,
+    return (dbSplits || []).map((row: any) => ({
+        id: `STL-${row.id}`,
         orderId: row.order_id,
-        amount: parseFloat(row.amount),
+        amount: parseFloat(row.store_amount), // Correct mapping to store's share
         fromUpi: row.admin_upi || 'grocesphere.admin@upi',
         transactionId: row.transaction_id,
         date: row.created_at,
-        status: row.status
+        status: row.is_settled ? 'COMPLETED' : 'PENDING'
     }));
 };

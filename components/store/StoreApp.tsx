@@ -98,9 +98,8 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
 
   const generatePDF = () => {
     const doc = new jsPDF();
-    const primaryColor = [15, 23, 42]; // Slate 900
+    const primaryColor = [15, 23, 42]; 
 
-    // 1. Header with Terminal Branding
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, 210, 45, 'F');
     
@@ -114,7 +113,6 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
     doc.text(`PARTNER: ${myStore?.name?.toUpperCase() || 'HUB TERMINAL'}`, 15, 35);
     doc.text(`GENERATED: ${new Date().toLocaleString().toUpperCase()}`, 140, 35);
 
-    // 2. Power BI Style Tiles (KPIs) - Use 'INR' instead of '₹' to avoid character corruption
     const tiles = [
       { label: 'GROSS SETTLEMENT', value: `INR ${analytics.totalRevenue.toLocaleString()}`, color: [255, 255, 255] },
       { label: 'EST. NET PROFIT', value: `INR ${analytics.totalProfit.toLocaleString()}`, color: [16, 185, 129] },
@@ -125,21 +123,20 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
     tiles.forEach((tile, i) => {
       const x = 15 + (i * 48);
       doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(226, 232, 240); // Slate 200
+      doc.setDrawColor(226, 232, 240); 
       doc.roundedRect(x, 55, 43, 30, 3, 3, 'FD');
       
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139); // Slate 500
+      doc.setTextColor(100, 116, 139); 
       doc.text(tile.label, x + 5, 65);
       
-      doc.setFontSize(10); // Slightly smaller to fit 'INR' comfortably
+      doc.setFontSize(10); 
       doc.setTextColor(tile.color[0], tile.color[1], tile.color[2]);
       if (tile.color[0] === 255) doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
       doc.text(tile.value, x + 5, 75);
     });
 
-    // 3. Section: Recent Settlement History
     doc.setFontSize(12);
     doc.setTextColor(15, 23, 42);
     doc.text('FINANCIAL SETTLEMENT LOG (INCOMING)', 15, 100);
@@ -159,7 +156,6 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
       theme: 'grid'
     });
 
-    // 4. Section: Inventory Stock Status
     const inventoryStartY = (doc as any).lastAutoTable.finalY + 20;
     doc.text('HUB INVENTORY AUDIT', 15, inventoryStartY);
     
@@ -179,7 +175,6 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
   };
 
   const generateCSV = () => {
-    // Detailed Settlement Report CSV as requested
     const headers = ['Settlement_Date', 'Settlement_ID', 'Transaction_ID', 'Admin_UPI_Source', 'Payout_Amount_INR', 'Payout_Status'];
     const rows = settlements.map(s => [
       new Date(s.date).toISOString().replace(/T/, ' ').replace(/\..+/, ''),
@@ -218,15 +213,20 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
 
   return (
     <div className="fixed inset-0 bg-slate-50 flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="bg-white px-8 py-6 shadow-sm z-20 shrink-0 border-b border-slate-100 flex justify-between items-center">
-         <div className="flex flex-col">
-           <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{myStore?.name || 'Grocesphere Mart'}</h1>
-           <div className="flex items-center gap-2 mt-1">
-             <SevenX7Logo size="xs" hideBrandName={true} />
-           </div>
+      {/* Absolute Centered Header */}
+      <header className="bg-white px-6 py-4 shadow-sm z-20 shrink-0 border-b border-slate-100 flex items-center justify-between relative h-28 sm:h-24">
+         <div className="z-10 mt-1">
+           <SevenX7Logo size="xs" hideBrandName={false} />
          </div>
-         <button onClick={() => setActiveTab('PROFILE')} className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl shadow-inner active:scale-90 transition-transform">⚙️</button>
+         
+         <div className="absolute left-1/2 -translate-x-1/2 text-center w-full max-w-[40%]">
+           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tighter leading-none truncate">{myStore?.name || 'Mart Hub'}</h1>
+           <p className="text-[8px] font-black text-emerald-500 uppercase tracking-[0.3em] mt-2">Active Cluster Terminal</p>
+         </div>
+
+         <button onClick={() => setActiveTab('PROFILE')} className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl shadow-inner active:scale-90 transition-transform z-10">
+            ⚙️
+         </button>
       </header>
 
       {/* Main Content Area */}
@@ -511,43 +511,6 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
         )}
       </main>
 
-      {/* Edit Overlay */}
-      {editingItem && (
-        <div className="fixed inset-0 z-[1000] flex items-end justify-center px-4 pb-12 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="w-full max-sm:max-w-full max-w-sm bg-white rounded-[4rem] p-10 shadow-2xl animate-slide-up space-y-8 relative">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <span className="text-4xl">{editingItem.emoji}</span>
-                        <div>
-                            <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none mb-1">{editingItem.name}</h3>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{editingItem.category}</p>
-                        </div>
-                    </div>
-                    <button onClick={() => setEditingItem(null)} className="w-12 h-12 bg-slate-50 rounded-full font-bold shadow-inner">✕</button>
-                </div>
-                
-                <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">MRP (₹)</label>
-                            <input type="number" value={editingItem.mrp || ''} onChange={e => setEditingItem({...editingItem, mrp: parseFloat(e.target.value)})} className="w-full bg-slate-50 p-5 rounded-3xl font-black outline-none border-none shadow-inner" />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Offer Price (₹)</label>
-                            <input type="number" value={editingItem.storePrice || ''} onChange={e => setEditingItem({...editingItem, storePrice: parseFloat(e.target.value)})} className="w-full bg-emerald-50 p-5 rounded-3xl font-black outline-none border-emerald-100 border text-emerald-700 shadow-inner" />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Current Stock</label>
-                        <input type="number" value={editingItem.stock || 0} onChange={e => setEditingItem({...editingItem, stock: parseInt(e.target.value)})} className="w-full bg-slate-50 p-5 rounded-3xl font-black outline-none border-none shadow-inner" />
-                    </div>
-                </div>
-
-                <button onClick={() => handleUpdateItem({})} className="w-full bg-[#0F172A] text-white py-6 rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-2xl active:scale-[0.98] transition-all">Sync Hub Node</button>
-            </div>
-        </div>
-      )}
-
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-slate-100 px-6 py-6 flex justify-between z-40 max-w-lg mx-auto rounded-t-[4rem] shadow-float">
            {[
@@ -559,7 +522,7 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
              <button key={item.id} onClick={() => { setActiveTab(item.id as any); setIsAddingNew(false); }} className={`flex flex-col items-center gap-2 transition-all ${activeTab === item.id ? 'text-slate-900 scale-110' : 'text-slate-300'}`}>
                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl transition-all ${activeTab === item.id ? 'bg-[#0F172A] text-white shadow-xl' : 'bg-transparent text-slate-400'}`}>
                     {item.id === 'DASHBOARD' ? (
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
                     ) : item.id === 'ORDERS' ? (
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path></svg>
                     ) : item.id === 'INVENTORY' ? (
