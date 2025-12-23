@@ -5,9 +5,15 @@ interface SevenX7LogoProps {
   size?: 'xs' | 'small' | 'medium' | 'large';
   onNewsClick?: () => void;
   hideBrandName?: boolean;
+  hideGrocesphere?: boolean;
 }
 
-const SevenX7Logo: React.FC<SevenX7LogoProps> = ({ size = 'small', onNewsClick, hideBrandName = false }) => {
+const SevenX7Logo: React.FC<SevenX7LogoProps> = ({ 
+  size = 'small', 
+  onNewsClick, 
+  hideBrandName = false,
+  hideGrocesphere = false
+}) => {
   
   const getTextSize = () => {
     switch(size) {
@@ -74,14 +80,14 @@ const SevenX7Logo: React.FC<SevenX7LogoProps> = ({ size = 'small', onNewsClick, 
       
       {/* Subtitles: Innovations & Grocesphere */}
       {!hideBrandName && (
-        <div className="flex flex-col items-center w-full mt-1.5">
+        <div className="flex flex-col items-center w-full mt-1">
           {/* Innovations Subtitle - High Spacing Tech Style */}
           <span 
             className="font-black uppercase tracking-[0.55em] text-emerald-500 leading-none whitespace-nowrap text-center"
             style={{ 
               fontSize: isLarge ? '14px' : isMedium ? '10px' : isXS ? '6px' : '8px',
               opacity: 0.95,
-              marginBottom: isXS ? '4px' : '6px',
+              marginBottom: hideGrocesphere ? '0px' : (isXS ? '4px' : '6px'),
               marginLeft: '0.55em' // Offset for the last letter's tracking
             }}
           >
@@ -89,16 +95,18 @@ const SevenX7Logo: React.FC<SevenX7LogoProps> = ({ size = 'small', onNewsClick, 
           </span>
           
           {/* Main Brand Name */}
-          <span 
-            className={`font-black uppercase tracking-[0.18em] text-slate-900 leading-none transition-all duration-300 group-hover:text-emerald-600 ${
-              isXS ? 'text-[9px] mt-1' : 
-              size === 'small' ? 'text-[13px] mt-2' : 
-              isMedium ? 'text-[18px] mt-3' : 
-              'text-[26px] mt-5'
-            }`}
-          >
-            My Store Grocesphere
-          </span>
+          {!hideGrocesphere && (
+            <span 
+              className={`font-black uppercase tracking-[0.18em] text-slate-900 leading-none transition-all duration-300 group-hover:text-emerald-600 ${
+                isXS ? 'text-[9px] mt-1' : 
+                size === 'small' ? 'text-[13px] mt-2' : 
+                isMedium ? 'text-[18px] mt-3' : 
+                'text-[26px] mt-5'
+              }`}
+            >
+              My Store Grocesphere
+            </span>
+          )}
         </div>
       )}
     </div>

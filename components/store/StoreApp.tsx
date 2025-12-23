@@ -213,18 +213,18 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
 
   return (
     <div className="fixed inset-0 bg-slate-50 flex flex-col overflow-hidden">
-      {/* Absolute Centered Header */}
-      <header className="bg-white px-6 py-4 shadow-sm z-20 shrink-0 border-b border-slate-100 flex items-center justify-between relative h-28 sm:h-24">
-         <div className="z-10 mt-1">
-           <SevenX7Logo size="xs" hideBrandName={false} />
+      {/* Absolute Centered Header - Reduced Height */}
+      <header className="bg-white px-6 shadow-sm z-20 shrink-0 border-b border-slate-100 flex items-center justify-between relative h-16 sm:h-20">
+         <div className="z-10">
+           <SevenX7Logo size="xs" hideGrocesphere={true} />
          </div>
          
          <div className="absolute left-1/2 -translate-x-1/2 text-center w-full max-w-[40%]">
-           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tighter leading-none truncate">{myStore?.name || 'Mart Hub'}</h1>
-           <p className="text-[8px] font-black text-emerald-500 uppercase tracking-[0.3em] mt-2">Active Cluster Terminal</p>
+           <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tighter leading-none truncate">{myStore?.name || 'Mart Hub'}</h1>
+           <p className="text-[7px] font-black text-emerald-500 uppercase tracking-[0.3em] mt-1">Live Cluster Node</p>
          </div>
 
-         <button onClick={() => setActiveTab('PROFILE')} className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-xl shadow-inner active:scale-90 transition-transform z-10">
+         <button onClick={() => setActiveTab('PROFILE')} className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shadow-inner active:scale-90 transition-transform z-10">
             ⚙️
          </button>
       </header>
@@ -522,7 +522,7 @@ export const StoreApp: React.FC<StoreAppProps> = ({ user, onLogout }) => {
              <button key={item.id} onClick={() => { setActiveTab(item.id as any); setIsAddingNew(false); }} className={`flex flex-col items-center gap-2 transition-all ${activeTab === item.id ? 'text-slate-900 scale-110' : 'text-slate-300'}`}>
                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl transition-all ${activeTab === item.id ? 'bg-[#0F172A] text-white shadow-xl' : 'bg-transparent text-slate-400'}`}>
                     {item.id === 'DASHBOARD' ? (
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
                     ) : item.id === 'ORDERS' ? (
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path></svg>
                     ) : item.id === 'INVENTORY' ? (

@@ -173,7 +173,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
         <header className="fixed top-0 left-0 right-0 z-[1000] px-5 py-4 pointer-events-none">
              <div className="flex items-center justify-between">
                  <div onClick={() => setActiveView('HOME')} className="pointer-events-auto bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-float cursor-pointer active:scale-95 transition-transform">
-                     <SevenX7Logo size="small" />
+                     <SevenX7Logo size="small" hideGrocesphere={true} />
                  </div>
                  <div className="flex items-center gap-3 pointer-events-auto">
                      <div className="bg-white/90 backdrop-blur-md border border-white rounded-full px-4 py-2.5 flex items-center gap-2 shadow-float cursor-pointer hover:bg-white" onClick={() => setActiveView('PROFILE')}>
