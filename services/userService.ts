@@ -31,7 +31,7 @@ export const registerUser = async (
     if (authError) throw authError;
     if (!authData.user) throw new Error("Registration failed.");
 
-    // 1. Create the Profile (Triggers usually depend on this being first)
+    // 1. Create the Profile with 'pending' status
     const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -40,37 +40,32 @@ export const registerUser = async (
             full_name: fullName,
             phone_number: phone,
             role: role,
-            upi_id: upiId 
+            upi_id: upiId,
+            verification_status: 'pending' // Enforce pending status
         });
 
     if (profileError) throw profileError;
 
-    // 2. If Partner, initialize their Store immediately
+    // 2. If Partner, initialize their Store immediately with 'pending' status
     if (role === 'store_owner' && storeName) {
-        const { error: storeError } = await supabase
+        await supabase
             .from('stores')
             .insert({
                 owner_id: authData.user.id,
                 name: storeName,
                 address: storeAddress || 'Address Pending',
                 upi_id: upiId,
-                is_open: true,
-                is_verified: false, // Pending admin audit
+                is_open: false, // Keep closed until approved
+                verification_status: 'pending',
                 type: 'Local Mart',
                 rating: 5.0,
-                lat: 12.9716, // Default Bangalore center, can be updated later
+                lat: 12.9716, 
                 lng: 77.5946
             });
-            
-        if (storeError) {
-            console.error("Store Creation Error:", storeError);
-            // We don't throw here to avoid blocking registration if profile was successful, 
-            // but the store can be created manually in the app later.
-        }
     }
 
     return {
-        isAuthenticated: true,
+        isAuthenticated: false, // Do not authenticate yet
         id: authData.user.id,
         phone: phone,
         email: email,
@@ -79,7 +74,8 @@ export const registerUser = async (
         savedCards: [],
         location: null,
         role: role,
-        upiId: upiId
+        upiId: upiId,
+        verificationStatus: 'pending'
     };
 };
 
@@ -99,27 +95,14 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         .single();
 
     if (profileError || !profileData) {
-        const metadata = authData.user.user_metadata;
-        const newProfile = {
-            id: authData.user.id,
-            email: authData.user.email,
-            full_name: metadata?.full_name || 'Merchant',
-            phone_number: metadata?.phone || '',
-            role: 'store_owner'
-        };
-        await supabase.from('profiles').upsert(newProfile);
-        
-        return {
-            isAuthenticated: true,
-            id: authData.user.id,
-            phone: newProfile.phone_number,
-            email: newProfile.email || '',
-            name: newProfile.full_name,
-            address: '',
-            savedCards: MOCK_CARDS,
-            location: null,
-            role: 'store_owner'
-        };
+        throw new Error("Profile not found.");
+    }
+
+    // CHECK FOR ADMIN APPROVAL
+    if (profileData.verification_status !== 'verified') {
+        const error: any = new Error("Your account is awaiting Super Admin approval.");
+        error.status = profileData.verification_status;
+        throw error;
     }
 
     return {
@@ -133,6 +116,7 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         location: null,
         role: profileData.role as any,
         upiId: profileData.upi_id,
+        verificationStatus: profileData.verification_status as any,
         gstNumber: profileData.gst_number || '',
         licenseNumber: profileData.license_number || ''
     };

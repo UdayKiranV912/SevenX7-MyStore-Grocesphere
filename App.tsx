@@ -3,14 +3,14 @@ import React, { useState } from 'react';
 import { UserState } from './types';
 import { Auth } from './components/OTPVerification';
 import { StoreApp } from './components/store/StoreApp';
-import { CustomerApp } from './components/customer/CustomerApp';
+import { SuperAdminApp } from './components/admin/SuperAdminApp';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserState>({
       isAuthenticated: false,
       phone: '',
       location: null,
-      role: 'customer' 
+      role: 'store_owner' 
   });
 
   const handleLoginSuccess = (userData: UserState) => {
@@ -21,7 +21,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    setUser({ isAuthenticated: false, phone: '', location: null, role: 'customer' });
+    setUser({ isAuthenticated: false, phone: '', location: null, role: 'store_owner' });
   };
 
   const handleDemoLogin = () => {
@@ -35,16 +35,6 @@ const App: React.FC = () => {
     });
   };
 
-  const handleCustomerDemoLogin = () => {
-    setUser({
-        isAuthenticated: true,
-        id: 'demo-customer',
-        name: 'Demo Customer',
-        phone: '8888800000',
-        role: 'customer'
-    });
-  };
-
   const handleUpdateUser = (updatedData: Partial<UserState>) => {
       setUser(prev => ({ ...prev, ...updatedData }));
   };
@@ -54,23 +44,18 @@ const App: React.FC = () => {
         <Auth 
             onLoginSuccess={handleLoginSuccess} 
             onDemoLogin={handleDemoLogin}
-            onCustomerDemoLogin={handleCustomerDemoLogin}
+            onCustomerDemoLogin={() => {}} // Disabled
         />
     );
   }
 
-  // Role-based navigation
-  if (user.role === 'store_owner') {
-      return <StoreApp user={user} onLogout={handleLogout} />;
+  // Super Admin view for approving merchants
+  if (user.role === 'super_admin') {
+      return <SuperAdminApp user={user} onLogout={handleLogout} />;
   }
 
-  return (
-    <CustomerApp 
-      user={user} 
-      onLogout={handleLogout} 
-      onUpdateUser={handleUpdateUser} 
-    />
-  );
+  // Default view is the Store Terminal
+  return <StoreApp user={user} onLogout={handleLogout} />;
 };
 
 export default App;

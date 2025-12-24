@@ -33,15 +33,39 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
             lng: row.lng,
             rating: row.rating,
             isOpen: row.is_open,
+            ownerId: row.owner_id,
             availableProductIds: []
         } as Store)));
     }
     setLoading(false);
   };
 
-  const handleVerify = async (storeId: string, status: 'verified' | 'rejected') => {
-      await supabase.from('stores').update({ verification_status: status }).eq('id', storeId);
-      loadStores();
+  const handleApprove = async (store: Store) => {
+      setLoading(true);
+      try {
+          // 1. Update Profile status
+          await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', store.ownerId);
+          // 2. Update Store status
+          await supabase.from('stores').update({ verification_status: 'verified', is_open: true }).eq('id', store.id);
+          await loadStores();
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const handleReject = async (store: Store) => {
+      setLoading(true);
+      try {
+          await supabase.from('profiles').update({ verification_status: 'rejected' }).eq('id', store.ownerId);
+          await supabase.from('stores').update({ verification_status: 'rejected', is_open: false }).eq('id', store.id);
+          await loadStores();
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setLoading(false);
+      }
   };
 
   return (
@@ -49,7 +73,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
       <header className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-slate-900/50 backdrop-blur-xl">
           <div className="flex items-center gap-4">
               <div className="bg-white p-2 rounded-xl">
-                  <SevenX7Logo size="xs" hideBrandName={true} />
+                  <SevenX7Logo size="xs" hideGrocesphere={true} />
               </div>
               <div>
                   <h1 className="text-sm font-black uppercase tracking-widest text-white/90">Platform Governance</h1>
@@ -62,7 +86,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
       <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <nav className="w-64 border-r border-white/5 p-6 space-y-2 hidden md:block">
-              <button onClick={() => setActiveTab('STORES')} className={`w-full text-left p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'STORES' ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-white'}`}>Merchant Registry</button>
+              <button onClick={() => setActiveTab('STORES')} className={`w-full text-left p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'STORES' ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-white'}`}>Merchant Audit</button>
               <button onClick={() => setActiveTab('ANALYTICS')} className={`w-full text-left p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ANALYTICS' ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-white'}`}>Global Stats</button>
           </nav>
 
@@ -71,8 +95,8 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
               {activeTab === 'STORES' && (
                   <div className="space-y-6 max-w-5xl">
                       <div className="flex justify-between items-end">
-                          <h2 className="text-2xl font-black tracking-tight">Merchant Applications</h2>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stores.length} Registered Nodes</p>
+                          <h2 className="text-2xl font-black tracking-tight">Pending Approval Queue</h2>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stores.filter(s => s.verificationStatus === 'pending').length} Awaiting Audit</p>
                       </div>
 
                       {loading ? (
@@ -80,7 +104,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
                       ) : (
                           <div className="grid grid-cols-1 gap-4">
                               {stores.map(store => (
-                                  <div key={store.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 flex items-center justify-between group hover:bg-white/10 transition-all">
+                                  <div key={store.id} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 flex items-center justify-between group hover:bg-white/10 transition-all animate-slide-up">
                                       <div className="flex items-center gap-6">
                                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${store.verificationStatus === 'verified' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-orange-500/20 text-orange-500'}`}>
                                               {store.verificationStatus === 'verified' ? '✓' : '!'}
@@ -90,7 +114,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
                                               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">{store.address}</p>
                                               <div className="flex gap-4 mt-3">
                                                   <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">UPI: <span className="text-white">{store.upiId || 'Not Linked'}</span></div>
-                                                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Type: <span className="text-white">{store.type}</span></div>
+                                                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status: <span className={store.verificationStatus === 'verified' ? 'text-emerald-400' : 'text-orange-400'}>{store.verificationStatus?.toUpperCase()}</span></div>
                                               </div>
                                           </div>
                                       </div>
@@ -98,17 +122,17 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
                                       <div className="flex gap-3">
                                           {store.verificationStatus !== 'verified' && (
                                               <button 
-                                                onClick={() => handleVerify(store.id, 'verified')}
+                                                onClick={() => handleApprove(store)}
                                                 className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
                                               >
-                                                  Verify Mart
+                                                  Approve
                                               </button>
                                           )}
                                           <button 
-                                            onClick={() => handleVerify(store.id, 'rejected')}
+                                            onClick={() => handleReject(store)}
                                             className="px-6 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
                                           >
-                                              Deactivate
+                                              {store.verificationStatus === 'verified' ? 'Suspend' : 'Reject'}
                                           </button>
                                       </div>
                                   </div>
