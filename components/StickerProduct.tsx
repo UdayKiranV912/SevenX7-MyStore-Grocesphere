@@ -8,10 +8,22 @@ interface StickerProductProps {
   onUpdateQuantity: (productId: string, delta: number) => void;
   onClick: (product: Product) => void;
   count: number;
+  isDemo?: boolean;
 }
 
-export const StickerProduct: React.FC<StickerProductProps> = ({ product, onAdd, onUpdateQuantity, onClick, count }) => {
+// Utility to convert a standard Google Drive share link to a direct image source
+const getDriveImageUrl = (url?: string) => {
+  if (!url) return null;
+  const match = url.match(/(?:\/d\/|id=)([\w-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+  }
+  return url;
+};
+
+export const StickerProduct: React.FC<StickerProductProps> = ({ product, onAdd, onUpdateQuantity, onClick, count, isDemo = false }) => {
   const hasMultipleBrands = product.brands && product.brands.length > 0;
+  const imageUrl = !isDemo ? getDriveImageUrl(product.imageUrl) : null;
 
   // Calculate Discount
   const mrp = product.mrp || product.price;
@@ -32,10 +44,14 @@ export const StickerProduct: React.FC<StickerProductProps> = ({ product, onAdd, 
       )}
 
       {/* Image Area */}
-      <div className="relative aspect-square mb-3 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-brand-light/40 transition-colors">
-        <div className={`text-6xl transform transition-all duration-500 emoji-3d group-hover:scale-110 ${count > 0 ? 'scale-105' : ''}`}>
-          {product.emoji}
-        </div>
+      <div className="relative aspect-square mb-3 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-brand-light/40 transition-colors overflow-hidden">
+        {imageUrl ? (
+          <img src={imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        ) : (
+          <div className={`text-6xl transform transition-all duration-500 emoji-3d group-hover:scale-110 ${count > 0 ? 'scale-105' : ''}`}>
+            {product.emoji}
+          </div>
+        )}
         
         {count > 0 && (
           <div className="absolute top-2 right-2 bg-brand-DEFAULT text-white text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg animate-scale-in z-20">

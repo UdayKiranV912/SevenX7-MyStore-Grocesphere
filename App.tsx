@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { UserState } from './types';
 import { Auth } from './components/OTPVerification';
 import { StoreApp } from './components/store/StoreApp';
+import { CustomerApp } from './components/customer/CustomerApp';
 import { SuperAdminApp } from './components/admin/SuperAdminApp';
 
 const App: React.FC = () => {
@@ -35,6 +36,17 @@ const App: React.FC = () => {
     });
   };
 
+  const handleCustomerDemoLogin = () => {
+    setUser({
+        isAuthenticated: true,
+        id: 'demo-customer',
+        name: 'Guest Customer',
+        phone: '0000000000',
+        role: 'customer',
+        verificationStatus: 'verified'
+    });
+  };
+
   const handleUpdateUser = (updatedData: Partial<UserState>) => {
       setUser(prev => ({ ...prev, ...updatedData }));
   };
@@ -44,7 +56,7 @@ const App: React.FC = () => {
         <Auth 
             onLoginSuccess={handleLoginSuccess} 
             onDemoLogin={handleDemoLogin}
-            onCustomerDemoLogin={() => {}} // Disabled
+            onCustomerDemoLogin={handleCustomerDemoLogin}
         />
     );
   }
@@ -52,6 +64,11 @@ const App: React.FC = () => {
   // Super Admin view for approving merchants
   if (user.role === 'super_admin') {
       return <SuperAdminApp user={user} onLogout={handleLogout} />;
+  }
+
+  // Customer View
+  if (user.role === 'customer') {
+      return <CustomerApp user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
   }
 
   // Default view is the Store Terminal

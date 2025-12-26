@@ -87,6 +87,13 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
       }).addTo(map);
 
       markersLayerRef.current = L.layerGroup().addTo(map);
+      
+      if (isSelectionMode && onMapClick) {
+          map.on('click', (e: any) => {
+              onMapClick(e.latlng.lat, e.latlng.lng);
+          });
+      }
+
       map.on('dragstart', () => setIsFollowingUser(false));
 
       mapInstanceRef.current = map;
@@ -102,7 +109,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
       };
     } catch (err) { console.error("Map Error:", err); }
-  }, []); 
+  }, [isSelectionMode, onMapClick]); 
 
   useEffect(() => {
     if (!enableLiveTracking || isSelectionMode) return;
@@ -133,11 +140,22 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         }).addTo(mapInstanceRef.current);
     }
 
-    const userIconHtml = `<div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div>`;
+    // "You Are Here" Marker with Store Emoji as requested
+    const userIconHtml = `
+      <div class="relative flex flex-col items-center">
+        <div class="bg-slate-900 w-12 h-12 rounded-[50%_50%_50%_6px] rotate-[-45deg] border-2 border-white shadow-2xl flex items-center justify-center transition-all duration-300 scale-110">
+            <div class="rotate-[45deg] text-2xl">🏪</div>
+        </div>
+        <div class="absolute -top-10 whitespace-nowrap bg-white text-slate-900 px-3 py-1 rounded-full border border-slate-200 shadow-xl">
+            <span class="text-[9px] font-black uppercase tracking-[0.2em]">You Are Here</span>
+        </div>
+        <div class="w-4 h-4 bg-emerald-400 rounded-full border-2 border-white absolute -bottom-2 blur-[2px] animate-pulse"></div>
+      </div>
+    `;
 
     if (userMarkerRef.current) { userMarkerRef.current.setLatLng(latLng); } 
     else {
-        const icon = L.divIcon({ className: 'bg-transparent border-none', html: userIconHtml, iconSize: [16, 16] });
+        const icon = L.divIcon({ className: 'bg-transparent border-none', html: userIconHtml, iconSize: [48, 48], iconAnchor: [24, 48] });
         userMarkerRef.current = L.marker(latLng, { icon, zIndexOffset: 2000 }).addTo(mapInstanceRef.current);
     }
 
@@ -171,11 +189,13 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   return (
     <div className={`w-full bg-slate-100 relative overflow-hidden isolate ${className}`}>
       <div ref={mapContainerRef} className="w-full h-full z-0" />
-      <div className="absolute bottom-4 right-4 z-[400]">
-          <button onClick={() => setIsFollowingUser(true)} className="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-slate-400 active:text-emerald-500 border border-slate-100 transition-all">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-          </button>
-      </div>
+      {!isSelectionMode && (
+          <div className="absolute bottom-4 right-4 z-[400]">
+              <button onClick={() => setIsFollowingUser(true)} className="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-slate-400 active:text-emerald-500 border border-slate-100 transition-all">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+              </button>
+          </div>
+      )}
     </div>
   );
 };

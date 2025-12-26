@@ -2,6 +2,7 @@
 export interface BrandOption {
   name: string;
   price: number; 
+  imageUrl?: string;
 }
 
 export interface BrandInventoryInfo {
@@ -9,6 +10,7 @@ export interface BrandInventoryInfo {
   mrp: number;   
   stock: number; 
   inStock: boolean;
+  imageUrl?: string;
 }
 
 export interface Product {
@@ -18,6 +20,7 @@ export interface Product {
   mrp?: number; 
   costPrice?: number;
   emoji: string;
+  imageUrl?: string;
   category: string;
   description?: string;
   ingredients?: string;
@@ -32,6 +35,14 @@ export interface BankDetails {
   ifscCode: string;
   bankName: string;
   accountHolder: string;
+}
+
+export interface AdCampaign {
+  id: string;
+  title: string;
+  description: string;
+  productId?: string;
+  status: 'active' | 'scheduled' | 'expired';
 }
 
 export interface Store {
@@ -52,6 +63,7 @@ export interface Store {
   gstNumber?: string;
   bankDetails?: BankDetails;
   verificationStatus: 'pending' | 'verified' | 'rejected';
+  ads?: AdCampaign[];
 }
 
 export interface InventoryItem extends Product {
