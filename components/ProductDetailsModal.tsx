@@ -8,19 +8,9 @@ interface ProductDetailsModalProps {
   onClose: () => void;
   onAdd: (product: Product, quantity: number, brand?: string, price?: number) => void;
   onUpdateDetails?: (id: string, details: Partial<Product>) => void;
-  isDemo?: boolean;
 }
 
-const getDriveImageUrl = (url?: string) => {
-  if (!url) return null;
-  const match = url.match(/(?:\/d\/|id=)([\w-]+)/);
-  if (match && match[1]) {
-    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
-  }
-  return url;
-};
-
-export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, onClose, onAdd, onUpdateDetails, isDemo = false }) => {
+export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, onClose, onAdd, onUpdateDetails }) => {
   const [details, setDetails] = useState<Partial<Product>>({
     description: product.description,
     ingredients: product.ingredients,
@@ -36,8 +26,6 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
   const currentPrice = currentBrand.price;
   const currentBrandName = currentBrand.name;
   
-  const displayImageUrl = !isDemo ? getDriveImageUrl(currentBrand.imageUrl || product.imageUrl) : null;
-
   const displayMrp = product.brands && product.brands.length > 0 
       ? currentPrice * 1.2 
       : (product.mrp || product.price);
@@ -70,7 +58,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
   }, [product, onUpdateDetails]);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:px-4">
+    <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center sm:px-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" onClick={onClose} />
 
       <div className="relative w-full max-w-sm bg-white rounded-t-[3rem] sm:rounded-[3rem] p-8 shadow-2xl animate-slide-up overflow-hidden max-h-[90vh] overflow-y-auto hide-scrollbar">
@@ -79,11 +67,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
 
         <div className="flex flex-col items-center pt-4">
           <div className="w-48 h-48 bg-white rounded-[2.5rem] flex items-center justify-center shadow-soft-xl mb-6 animate-bounce-soft border-4 border-white relative overflow-hidden">
-            {displayImageUrl ? (
-                <img src={displayImageUrl} alt={product.name} className="w-full h-full object-cover" />
-            ) : (
-                <div className="text-[6rem] emoji-3d">{product.emoji}</div>
-            )}
+            <div className="text-[6.5rem] emoji-3d">{product.emoji}</div>
             {discount > 0 && (
                 <div className="absolute -top-2 -right-2 bg-red-500 text-white text-sm font-black px-3 py-1.5 rounded-full shadow-lg rotate-12">
                     {discount}% OFF
@@ -98,28 +82,6 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
               <p className="text-4xl font-black text-brand-DEFAULT">₹{currentPrice}</p>
           </div>
         </div>
-
-        {product.brands && product.brands.length > 0 && (
-           <div className="mt-6">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mb-3">Select Brand</p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                 {brands.map((brand, idx) => (
-                    <button
-                       key={idx}
-                       onClick={() => setSelectedBrandIndex(idx)}
-                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                           selectedBrandIndex === idx 
-                             ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105' 
-                             : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                       }`}
-                    >
-                       {brand.name}
-                       <span className={`ml-1 opacity-70 ${selectedBrandIndex === idx ? 'text-slate-300' : 'text-slate-400'}`}>₹{brand.price}</span>
-                    </button>
-                 ))}
-              </div>
-           </div>
-        )}
 
         <div className="mt-8 space-y-5">
            {loading ? (

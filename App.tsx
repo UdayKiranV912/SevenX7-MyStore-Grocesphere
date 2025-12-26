@@ -25,6 +25,7 @@ const App: React.FC = () => {
     setUser({ isAuthenticated: false, phone: '', location: null, role: 'store_owner' });
   };
 
+  // Comment: Fix type error by adding the required 'location' property
   const handleDemoLogin = () => {
     setUser({
         isAuthenticated: true,
@@ -32,10 +33,12 @@ const App: React.FC = () => {
         name: 'Partner Demo',
         phone: '9999900000',
         role: 'store_owner',
-        verificationStatus: 'verified'
+        verificationStatus: 'verified',
+        location: null
     });
   };
 
+  // Comment: Fix type error by adding the required 'location' property
   const handleCustomerDemoLogin = () => {
     setUser({
         isAuthenticated: true,
@@ -43,7 +46,8 @@ const App: React.FC = () => {
         name: 'Guest Customer',
         phone: '0000000000',
         role: 'customer',
-        verificationStatus: 'verified'
+        verificationStatus: 'verified',
+        location: null
     });
   };
 
