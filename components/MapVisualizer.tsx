@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Store, OrderMode } from '../types';
-import { watchLocation, clearWatch } from '../services/locationService';
+import { watchLocation, clearWatch, getBrowserLocation } from '../services/locationService';
 
 interface MapVisualizerProps {
   stores: Store[];
@@ -102,13 +102,13 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   }, [isSelectionMode, onMapClick]); 
 
   useEffect(() => {
-    if (!enableLiveTracking || isSelectionMode) return;
+    if (!enableLiveTracking) return;
     const watchId = watchLocation(
       (loc) => setInternalUserLoc({ lat: loc.lat, lng: loc.lng, acc: loc.accuracy }),
       () => {}
     );
     return () => clearWatch(watchId);
-  }, [enableLiveTracking, isSelectionMode]);
+  }, [enableLiveTracking]);
 
   useEffect(() => {
     const L = (window as any).L;
@@ -145,8 +145,21 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         userMarkerRef.current = L.marker(latLng, { icon, zIndexOffset: 2000 }).addTo(mapInstanceRef.current);
     }
 
-    if (!isSelectionMode && isFollowingUser) { mapInstanceRef.current.panTo(latLng); }
-  }, [finalUserLat, finalUserLng, finalAccuracy, isMapReady, isSelectionMode, isFollowingUser]);
+    if (isFollowingUser) { mapInstanceRef.current.panTo(latLng); }
+  }, [finalUserLat, finalUserLng, finalAccuracy, isMapReady, isFollowingUser]);
+
+  const handleLocateMe = async () => {
+    try {
+      const loc = await getBrowserLocation();
+      setInternalUserLoc({ lat: loc.lat, lng: loc.lng, acc: loc.accuracy });
+      setIsFollowingUser(true);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo([loc.lat, loc.lng], 18);
+      }
+    } catch (e) {
+      alert("Could not detect location. Please check GPS settings.");
+    }
+  };
 
   useEffect(() => {
     const L = (window as any).L;
@@ -204,17 +217,19 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
       <div ref={mapContainerRef} className="w-full h-full z-0" />
       
       {/* Attribution */}
-      <div className="absolute bottom-2 left-2 z-[400] bg-white/60 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] font-bold text-slate-500 pointer-events-none">
-          © OpenStreetMap
+      <div className="absolute bottom-2 left-2 z-[400] bg-white/70 backdrop-blur-md px-2 py-1 rounded-md text-[9px] font-bold text-slate-600 pointer-events-none shadow-sm border border-slate-100/50">
+          © OpenStreetMap contributors
       </div>
 
-      {!isSelectionMode && (
-          <div className="absolute bottom-4 right-4 z-[400]">
-              <button onClick={() => setIsFollowingUser(true)} className="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-slate-400 active:text-blue-500 border border-slate-100 transition-all">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-              </button>
-          </div>
-      )}
+      <div className="absolute bottom-4 right-4 z-[400] flex flex-col gap-2">
+          <button 
+            onClick={handleLocateMe} 
+            title="Detect Live Location"
+            className="w-12 h-12 bg-white rounded-2xl shadow-xl flex items-center justify-center text-slate-900 border border-slate-100 active:scale-90 transition-all group"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 group-hover:text-blue-600"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+          </button>
+      </div>
     </div>
   );
 };
