@@ -3,7 +3,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>My Store Grocesphere</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -102,7 +102,12 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <style>
-      body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+      body { 
+        font-family: 'Inter', sans-serif; 
+        background-color: #f8fafc; 
+        color: #0f172a;
+        touch-action: manipulation; /* Prevents double-tap to zoom */
+      }
       h1, h2, h3, h4, h5, h6 { font-family: 'Lexend', sans-serif; }
       .emoji-3d {
         filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15));
