@@ -95,6 +95,11 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
 export const subscribeToUserOrders = (userId: string, onUpdate: (payload: any) => void) => {
     return supabase
         .channel(`user-orders-${userId}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `customer_id=eq.${userId}` }, (payload) => onUpdate(payload.new))
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'orders', 
+            filter: `customer_id=eq.${userId}` 
+        }, (payload) => onUpdate(payload.new))
         .subscribe();
 };

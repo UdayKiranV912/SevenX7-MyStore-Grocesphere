@@ -56,11 +56,23 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
       owner_id: data.owner_id,
       gstNumber: data.gst_number || '',
       bankDetails: data.bank_details,
-      verificationStatus: data.is_verified ? 'verified' : 'pending' // Aligned with SQL is_verified column
+      verificationStatus: data.is_verified ? 'verified' : 'pending' 
     } as any;
   } catch (e) {
     return null;
   }
+};
+
+export const subscribeToStoreOrders = (storeId: string, onUpdate: () => void) => {
+    return supabase
+        .channel(`store-orders-${storeId}`)
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'orders', 
+            filter: `store_id=eq.${storeId}` 
+        }, () => onUpdate())
+        .subscribe();
 };
 
 export const updateStoreProfile = async (storeId: string, updates: Partial<Store>) => {
@@ -130,7 +142,6 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
       const mockOrders: Order[] = [];
       const customers = ['Priya Kapoor', 'Amit Verma', 'Rahul Sen', 'Sonia Nair', 'Vikram Rao'];
       
-      // Add current active tracking orders for demo
       mockOrders.push({
           id: `demo-track-1`,
           date: new Date().toISOString(),
@@ -138,7 +149,7 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
               { ...INITIAL_PRODUCTS[0], quantity: 1, selectedBrand: 'Generic', originalProductId: '1', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }
           ],
           total: 850,
-          status: 'packing', // Will trigger "Pickup tracking" in demo
+          status: 'packing',
           paymentStatus: 'PAID',
           paymentMethod: 'ONLINE',
           mode: 'DELIVERY',
@@ -180,7 +191,17 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
 
   const { data: orders } = await supabase.from('orders').select('*, profiles(full_name, phone_number)').eq('store_id', storeId).order('created_at', { ascending: false });
   return (orders || []).map((row: any) => ({
-    id: row.id, date: row.created_at, items: row.items, total: parseFloat(row.total_amount), status: row.status as any, paymentStatus: row.payment_status || 'PAID', paymentMethod: row.payment_method || 'ONLINE', mode: row.type || 'DELIVERY', deliveryType: 'INSTANT', storeName: 'Partner Hub', customerName: row.profiles?.full_name || 'Customer'
+    id: row.id, 
+    date: row.created_at, 
+    items: row.items, 
+    total: parseFloat(row.total_amount), 
+    status: row.status as any, 
+    paymentStatus: row.payment_status || 'PAID', 
+    paymentMethod: row.payment_method || 'ONLINE', 
+    mode: row.type || 'DELIVERY', 
+    deliveryType: 'INSTANT', 
+    storeName: 'Partner Hub', 
+    customerName: row.profiles?.full_name || 'Customer'
   }));
 };
 
@@ -237,7 +258,6 @@ export const getSettlements = async (storeId: string): Promise<Settlement[]> => 
         return mockSettlements;
     }
 
-    // Query payment_splits as defined in SQL logic (RLS handles store visibility)
     const { data: dbSplits } = await supabase
         .from('payment_splits')
         .select('*')
@@ -246,7 +266,7 @@ export const getSettlements = async (storeId: string): Promise<Settlement[]> => 
     return (dbSplits || []).map((row: any) => ({
         id: `STL-${row.id}`,
         orderId: row.order_id,
-        amount: parseFloat(row.store_amount), // Correct mapping to store's share
+        amount: parseFloat(row.store_amount),
         fromUpi: row.admin_upi || 'grocesphere.admin@upi',
         transactionId: row.transaction_id,
         date: row.created_at,

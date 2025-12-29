@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { UserState, Store, Order, InventoryItem, Settlement } from '../../types';
-import { getMyStore, getStoreInventory, getIncomingOrders, updateStoreOrderStatus, updateInventoryItem, createCustomProduct, getSettlements, updateStoreProfile } from '../../services/storeAdminService';
+import { getMyStore, getStoreInventory, getIncomingOrders, updateStoreOrderStatus, updateInventoryItem, createCustomProduct, getSettlements, updateStoreProfile, subscribeToStoreOrders } from '../../services/storeAdminService';
 import SevenX7Logo from '../SevenX7Logo';
 import { getBrowserLocation, reverseGeocode } from '../../services/locationService';
 import { MapVisualizer } from '../MapVisualizer';
@@ -26,7 +26,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
   const [simulatedRiderPos, setSimulatedRiderPos] = useState<{lat: number, lng: number} | null>(null);
 
-  // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
       name: '',
@@ -40,7 +39,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
       ifsc: ''
   });
 
-  // Inventory State
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newItem, setNewItem] = useState({
@@ -90,7 +88,15 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
 
   useEffect(() => { loadData(); }, [user.id]);
 
-  // Simulation for Rider approaching for pickup
+  useEffect(() => {
+    if (myStore && !user.id?.includes('demo')) {
+        const sub = subscribeToStoreOrders(myStore.id, () => {
+            loadData();
+        });
+        return () => { sub.unsubscribe(); };
+    }
+  }, [myStore]);
+
   useEffect(() => {
     if (!trackingOrder || !myStore) return;
     
@@ -98,7 +104,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     const interval = setInterval(() => {
         step += 1;
         const progress = (step % 100) / 100;
-        // Rider starts slightly away and moves toward store
         const startLat = myStore.lat + 0.005;
         const startLng = myStore.lng + 0.005;
         setSimulatedRiderPos({
@@ -351,7 +356,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
             </div>
         )}
 
-        {/* Live Rider Tracking Modal */}
         {trackingOrder && (
             <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center animate-fade-in">
                 <div className="bg-white w-full max-w-lg rounded-t-[3.5rem] sm:rounded-[3.5rem] p-8 shadow-2xl animate-slide-up flex flex-col gap-6 relative">
@@ -474,7 +478,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                                 <button key={cat} onClick={() => setCategoryFilter(cat)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase whitespace-nowrap transition-all ${categoryFilter === cat ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-100 shadow-sm'}`}>{cat}</button>
                             ))}
                         </div>
-                        {/* SAPPHIRE THEME GRID */}
                         <div className="grid grid-cols-1 gap-4 px-2">
                             {inventory.filter(i => (categoryFilter === 'All' || i.category === categoryFilter) && i.isActive).map(item => (
                                 <div key={item.id} className="bg-slate-900 border border-blue-900/30 p-6 rounded-[2.5rem] shadow-xl flex flex-col gap-5 group transition-all hover:bg-slate-800">
@@ -602,8 +605,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                 </div>
                 <div className="flex-1 relative rounded-[3.5rem] overflow-hidden border-4 border-white shadow-2xl group mx-2">
                     <MapVisualizer stores={[]} userLat={myStore?.lat || 12.9716} userLng={myStore?.lng || 77.5946} selectedStore={null} onSelectStore={() => {}} mode="PICKUP" isSelectionMode={true} forcedCenter={{ lat: myStore?.lat || 12.9716, lng: myStore?.lng || 77.5946 }} />
-                    
-                    {/* Live Detect Button Over Map */}
                     <button 
                         onClick={handleDetectLive}
                         className="absolute bottom-10 right-10 z-[500] bg-slate-900 text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-3 active:scale-95 transition-all animate-bounce-soft border-2 border-white/10 group-hover:scale-105"

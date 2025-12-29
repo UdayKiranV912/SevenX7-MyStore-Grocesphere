@@ -16,6 +16,18 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
 
   useEffect(() => {
     loadStores();
+    
+    // REAL-TIME SUBSCRIPTION FOR NEW STORES
+    const sub = supabase
+        .channel('admin-stores-sync')
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'stores' 
+        }, () => loadStores())
+        .subscribe();
+
+    return () => { sub.unsubscribe(); };
   }, []);
 
   const loadStores = async () => {
@@ -43,9 +55,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleApprove = async (store: Store) => {
       setLoading(true);
       try {
-          // 1. Update Profile status
           await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', store.ownerId);
-          // 2. Update Store status
           await supabase.from('stores').update({ verification_status: 'verified', is_open: true }).eq('id', store.id);
           await loadStores();
       } catch (e) {
@@ -84,13 +94,11 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-          {/* Sidebar */}
           <nav className="w-64 border-r border-white/5 p-6 space-y-2 hidden md:block">
               <button onClick={() => setActiveTab('STORES')} className={`w-full text-left p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'STORES' ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-white'}`}>Merchant Audit</button>
               <button onClick={() => setActiveTab('ANALYTICS')} className={`w-full text-left p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ANALYTICS' ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-white'}`}>Global Stats</button>
           </nav>
 
-          {/* Main Content */}
           <main className="flex-1 overflow-y-auto p-8">
               {activeTab === 'STORES' && (
                   <div className="space-y-6 max-w-5xl">
