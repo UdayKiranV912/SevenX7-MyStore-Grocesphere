@@ -53,11 +53,11 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
       type: data.type as any,
       availableProductIds: [],
       upiId: data.upi_id,
-      ownerId: data.owner_id,
+      owner_id: data.owner_id,
       gstNumber: data.gst_number || '',
       bankDetails: data.bank_details,
       verificationStatus: data.is_verified ? 'verified' : 'pending' // Aligned with SQL is_verified column
-    };
+    } as any;
   } catch (e) {
     return null;
   }
@@ -130,6 +130,25 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
       const mockOrders: Order[] = [];
       const customers = ['Priya Kapoor', 'Amit Verma', 'Rahul Sen', 'Sonia Nair', 'Vikram Rao'];
       
+      // Add current active tracking orders for demo
+      mockOrders.push({
+          id: `demo-track-1`,
+          date: new Date().toISOString(),
+          items: [
+              { ...INITIAL_PRODUCTS[0], quantity: 1, selectedBrand: 'Generic', originalProductId: '1', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }
+          ],
+          total: 850,
+          status: 'packing', // Will trigger "Pickup tracking" in demo
+          paymentStatus: 'PAID',
+          paymentMethod: 'ONLINE',
+          mode: 'DELIVERY',
+          deliveryType: 'INSTANT',
+          storeName: 'Grocesphere Demo Mart',
+          customerName: 'Rohit Sharma',
+          storeLocation: { lat: 12.9716, lng: 77.6410 },
+          userLocation: { lat: 12.9800, lng: 77.6500 }
+      });
+
       for(let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() - i);
@@ -148,7 +167,9 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
                 mode: 'DELIVERY',
                 deliveryType: 'INSTANT',
                 storeName: 'Grocesphere Demo Mart',
-                customerName: customers[Math.floor(Math.random() * customers.length)]
+                customerName: customers[Math.floor(Math.random() * customers.length)],
+                storeLocation: { lat: 12.9716, lng: 77.6410 },
+                userLocation: { lat: 12.9800, lng: 77.6500 }
             });
         }
       }

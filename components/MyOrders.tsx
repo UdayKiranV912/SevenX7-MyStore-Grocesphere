@@ -67,7 +67,13 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                     if (updatedOrderDb.status === 'picked_up') appStatus = 'picked_up';
                     if (updatedOrderDb.status === 'cancelled') appStatus = 'cancelled';
                     
-                    return { ...o, status: appStatus };
+                    return { 
+                      ...o, 
+                      status: appStatus,
+                      driverLocation: updatedOrderDb.driver_lat && updatedOrderDb.driver_lng 
+                        ? { lat: updatedOrderDb.driver_lat, lng: updatedOrderDb.driver_lng } 
+                        : o.driverLocation
+                    };
                 }
                 return o;
             }));
@@ -156,7 +162,14 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
   };
 
   const getSimulatedDriverPos = (order: Order) => {
-      if (order.status !== 'on_way' || !order.storeLocation || !order.userLocation) return undefined;
+      // 1. FOR REAL USERS: USE REAL TIME DATA ONLY
+      if (userId && !userId.includes('demo')) {
+          return order.driverLocation;
+      }
+
+      // 2. FOR DEMO MODE: MOCK SIMULATION
+      const isLiveTracking = order.status === 'on_way' || order.status === 'packing';
+      if (!isLiveTracking || !order.storeLocation || !order.userLocation) return undefined;
       
       if (!isValidCoord(order.storeLocation.lat) || !isValidCoord(order.storeLocation.lng) ||
           !isValidCoord(order.userLocation.lat) || !isValidCoord(order.userLocation.lng)) return undefined;
@@ -166,6 +179,18 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       const t = (tick + offset) % loopDuration;
       const progress = t / loopDuration;
 
+      // Phase 1: Rider -> Store (Pickup)
+      if (order.status === 'packing') {
+          // Mocking a Rider Hub starting point 1km away
+          const startLat = order.storeLocation.lat + 0.008;
+          const startLng = order.storeLocation.lng + 0.008;
+          return {
+              lat: startLat + (order.storeLocation.lat - startLat) * progress,
+              lng: startLng + (order.storeLocation.lng - startLng) * progress
+          };
+      }
+
+      // Phase 2: Store -> User (Delivery)
       const lat = order.storeLocation.lat + (order.userLocation.lat - order.storeLocation.lat) * progress;
       const lng = order.storeLocation.lng + (order.userLocation.lng - order.storeLocation.lng) * progress;
       
@@ -195,7 +220,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         if (order.status === 'placed') statusColor = 'bg-yellow-50 text-yellow-700';
         if (isPaymentPending) statusColor = 'bg-orange-50 text-orange-700';
 
-        // Comment: Added verificationStatus to satisfy Store type definition
         const mapStore: Store = {
             id: `order-store-${order.id}`,
             name: order.storeName || 'Store',
@@ -211,6 +235,8 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         };
         
         const driverPos = getSimulatedDriverPos(order);
+        const isRealUser = userId && !userId.includes('demo');
+        const showMap = !isCancelled && !isCompleted && order.storeLocation && !isPaymentPending && (isRealUser ? (!!order.driverLocation || order.status === 'on_way' || order.status === 'packing') : true);
 
         return (
           <div 
@@ -281,8 +307,8 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
 
             {isExpanded && (
                 <div className="mt-4 pt-4 border-t border-slate-50 animate-fade-in">
-                    {!isCancelled && !isCompleted && order.storeLocation && !isPaymentPending && (
-                        <div className="h-40 rounded-2xl overflow-hidden mb-6 border border-slate-100 shadow-inner relative z-0" onClick={(e) => e.stopPropagation()}>
+                    {showMap && (
+                        <div className="h-44 rounded-[2.5rem] overflow-hidden mb-6 border-4 border-slate-50 shadow-inner relative z-0" onClick={(e) => e.stopPropagation()}>
                             <MapVisualizer
                                 stores={[mapStore]}
                                 selectedStore={mapStore}
@@ -295,6 +321,14 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                                 className="h-full"
                                 driverLocation={driverPos}
                             />
+                            {isRealUser && !order.driverLocation && (order.status === 'on_way' || order.status === 'packing') && (
+                                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6 text-center z-50">
+                                    <div className="bg-white p-4 rounded-2xl shadow-xl">
+                                        <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Awaiting Live GPS Signal...</p>
+                                        <p className="text-[8px] text-slate-400 font-bold mt-1">Rider assigned. Positioning will sync shortly.</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Order Items</h4>

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Store, OrderMode } from '../types';
-import { watchLocation, clearWatch, getBrowserLocation } from '../services/locationService';
+import { watchLocation, clearWatch, getBrowserLocation, getRoute } from '../services/locationService';
 
 interface MapVisualizerProps {
   stores: Store[];
@@ -37,7 +37,8 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   isSelectionMode = false,
   enableLiveTracking = true,
   forcedCenter,
-  driverLocation
+  driverLocation,
+  showRoute = false
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -45,6 +46,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
   const markersLayerRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
   const driverMarkerRef = useRef<any>(null);
+  const routeLayerRef = useRef<any>(null);
 
   const [isMapReady, setIsMapReady] = useState(false);
   const [isFollowingUser, setIsFollowingUser] = useState(!isSelectionMode);
@@ -82,6 +84,7 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
       }).addTo(map);
 
       markersLayerRef.current = L.layerGroup().addTo(map);
+      routeLayerRef.current = L.layerGroup().addTo(map);
       
       if (isSelectionMode && onMapClick) {
           map.on('click', (e: any) => onMapClick(e.latlng.lat, e.latlng.lng));
@@ -174,8 +177,9 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
     const latLng: [number, number] = [driverLocation.lat, driverLocation.lng];
     const driverIconHtml = `
       <div class="relative flex flex-col items-center">
-        <div class="bg-blue-600 w-10 h-10 rounded-2xl border-2 border-white shadow-xl flex items-center justify-center">
-            <div class="text-xl">🛵</div>
+        <div class="absolute w-14 h-14 bg-blue-400/20 rounded-full animate-ping"></div>
+        <div class="bg-blue-600 w-12 h-12 rounded-3xl border-2 border-white shadow-xl flex items-center justify-center relative z-10 transition-all duration-500">
+            <div class="text-2xl">🛵</div>
         </div>
       </div>
     `;
@@ -183,10 +187,31 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
     if (driverMarkerRef.current) {
         driverMarkerRef.current.setLatLng(latLng);
     } else {
-        const icon = L.divIcon({ className: 'bg-transparent border-none', html: driverIconHtml, iconSize: [40, 40], iconAnchor: [20, 20] });
+        const icon = L.divIcon({ className: 'bg-transparent border-none', html: driverIconHtml, iconSize: [56, 56], iconAnchor: [28, 28] });
         driverMarkerRef.current = L.marker(latLng, { icon, zIndexOffset: 1500 }).addTo(mapInstanceRef.current);
     }
   }, [driverLocation, isMapReady]);
+
+  // Routing Polyline Rendering
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!isMapReady || !L || !routeLayerRef.current || !showRoute) return;
+    routeLayerRef.current.clearLayers();
+
+    if (driverLocation && selectedStore) {
+        getRoute(driverLocation.lat, driverLocation.lng, selectedStore.lat, selectedStore.lng).then(res => {
+            if (res && res.coordinates) {
+                L.polyline(res.coordinates, {
+                    color: '#3b82f6',
+                    weight: 4,
+                    opacity: 0.6,
+                    dashArray: '8, 12',
+                    lineCap: 'round'
+                }).addTo(routeLayerRef.current);
+            }
+        });
+    }
+  }, [showRoute, driverLocation, selectedStore, isMapReady]);
 
   useEffect(() => {
     const L = (window as any).L;

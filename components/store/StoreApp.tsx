@@ -23,6 +23,8 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [orderFilter, setOrderFilter] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+  const [simulatedRiderPos, setSimulatedRiderPos] = useState<{lat: number, lng: number} | null>(null);
 
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -87,6 +89,25 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   };
 
   useEffect(() => { loadData(); }, [user.id]);
+
+  // Simulation for Rider approaching for pickup
+  useEffect(() => {
+    if (!trackingOrder || !myStore) return;
+    
+    let step = 0;
+    const interval = setInterval(() => {
+        step += 1;
+        const progress = (step % 100) / 100;
+        // Rider starts slightly away and moves toward store
+        const startLat = myStore.lat + 0.005;
+        const startLng = myStore.lng + 0.005;
+        setSimulatedRiderPos({
+            lat: startLat + (myStore.lat - startLat) * progress,
+            lng: startLng + (myStore.lng - startLng) * progress
+        });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [trackingOrder, myStore]);
 
   const handleUpdateProfile = async () => {
       if (!myStore) return;
@@ -303,7 +324,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                             </div>
                             
                             {orderFilter === 'ACTIVE' && (
-                                <div className="flex gap-3 pt-2">
+                                <div className="flex gap-2 pt-2">
                                     {order.status === 'placed' && (
                                         <>
                                             <button onClick={() => handleUpdateStatus(order.id, 'packing')} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Accept Order</button>
@@ -311,15 +332,69 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                                         </>
                                     )}
                                     {order.status === 'packing' && (
-                                        <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'on_way' : 'ready')} className="w-full bg-slate-900 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Mark Ready for Dispatch</button>
+                                        <>
+                                            <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'on_way' : 'ready')} className="flex-1 bg-slate-900 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Mark Ready</button>
+                                            <button onClick={() => setTrackingOrder(order)} className="px-4 bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">Track Rider</button>
+                                        </>
                                     )}
                                     {(order.status === 'on_way' || order.status === 'ready') && (
-                                        <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'delivered' : 'picked_up')} className="w-full bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Finalize Completion</button>
+                                        <>
+                                            <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'delivered' : 'picked_up')} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Finalize Order</button>
+                                            {order.mode === 'DELIVERY' && <button onClick={() => setTrackingOrder(order)} className="px-4 bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">Live Track</button>}
+                                        </>
                                     )}
                                 </div>
                             )}
                         </div>
                     ))}
+                </div>
+            </div>
+        )}
+
+        {/* Live Rider Tracking Modal */}
+        {trackingOrder && (
+            <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center animate-fade-in">
+                <div className="bg-white w-full max-w-lg rounded-t-[3.5rem] sm:rounded-[3.5rem] p-8 shadow-2xl animate-slide-up flex flex-col gap-6 relative">
+                    <button onClick={() => setTrackingOrder(null)} className="absolute top-6 right-8 text-slate-300 text-2xl">✕</button>
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">🛵</div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Rider Tracking</h3>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID: #{trackingOrder.id.slice(-6)}</p>
+                        </div>
+                    </div>
+
+                    <div className="h-64 rounded-[2.5rem] overflow-hidden border border-slate-100 relative shadow-inner">
+                        <MapVisualizer 
+                            stores={[]} 
+                            userLat={myStore?.lat || 12.9716} 
+                            userLng={myStore?.lng || 77.5946} 
+                            selectedStore={null} 
+                            onSelectStore={() => {}} 
+                            mode="PICKUP" 
+                            isSelectionMode={false} 
+                            enableLiveTracking={false}
+                            driverLocation={simulatedRiderPos}
+                            forcedCenter={{ lat: myStore?.lat || 12.9716, lng: myStore?.lng || 77.5946 }}
+                        />
+                        <div className="absolute top-4 left-4 z-[500] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">Rider Approaching</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Estimated Arrival</p>
+                                <p className="text-lg font-black text-slate-900">2-4 Minutes</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Status</p>
+                                <p className="text-lg font-black text-blue-600">IN TRANSIT</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         )}

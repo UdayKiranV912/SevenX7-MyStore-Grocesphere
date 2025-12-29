@@ -144,6 +144,7 @@ export interface Order {
   storeName: string;
   storeLocation?: { lat: number; lng: number };
   userLocation?: { lat: number; lng: number };
+  driverLocation?: { lat: number; lng: number }; // Live GPS coordinates
   splits?: PaymentSplit;
   customerName?: string;
   customerPhone?: string;

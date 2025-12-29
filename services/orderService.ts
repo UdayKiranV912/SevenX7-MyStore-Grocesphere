@@ -83,6 +83,7 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
         storeName: row.stores?.name || 'My store Grocesphere Store',
         storeLocation: row.stores ? { lat: row.stores.lat, lng: row.stores.lng } : undefined,
         userLocation: { lat: row.delivery_lat, lng: row.delivery_lng },
+        driverLocation: row.driver_lat && row.driver_lng ? { lat: row.driver_lat, lng: row.driver_lng } : undefined,
         transactionId: row.transaction_id
     }));
   } catch (err) {
