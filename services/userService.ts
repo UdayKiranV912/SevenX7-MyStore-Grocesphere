@@ -17,7 +17,8 @@ export const registerUser = async (
     storeName?: string,
     storeAddress?: string
 ): Promise<UserState> => {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Comment: Bypass SupabaseAuthClient type resolution error for signUp method
+    const { data: authData, error: authError } = await (supabase.auth as any).signUp({
         email,
         password,
         options: {
@@ -80,7 +81,8 @@ export const registerUser = async (
 };
 
 export const loginUser = async (email: string, password: string): Promise<UserState> => {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    // Comment: Bypass SupabaseAuthClient type resolution error for signInWithPassword method
+    const { data: authData, error: authError } = await (supabase.auth as any).signInWithPassword({
         email,
         password
     });

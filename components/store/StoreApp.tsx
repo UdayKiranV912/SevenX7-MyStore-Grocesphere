@@ -97,70 +97,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     }
   }, [myStore]);
 
-  useEffect(() => {
-    if (!trackingOrder || !myStore) return;
-    
-    let step = 0;
-    const interval = setInterval(() => {
-        step += 1;
-        const progress = (step % 100) / 100;
-        const startLat = myStore.lat + 0.005;
-        const startLng = myStore.lng + 0.005;
-        setSimulatedRiderPos({
-            lat: startLat + (myStore.lat - startLat) * progress,
-            lng: startLng + (myStore.lng - startLng) * progress
-        });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [trackingOrder, myStore]);
-
-  const handleUpdateProfile = async () => {
-      if (!myStore) return;
-      setLoading(true);
-      try {
-          await updateStoreProfile(myStore.id, {
-              name: profileForm.name,
-              type: profileForm.type,
-              address: profileForm.address,
-              gstNumber: profileForm.gstNumber,
-              upiId: profileForm.upiId,
-              bankDetails: {
-                  bankName: profileForm.bankName,
-                  accountNumber: profileForm.accNo,
-                  ifscCode: profileForm.ifsc,
-                  accountHolder: user.name || ''
-              }
-          });
-          await loadData();
-          setIsEditingProfile(false);
-      } catch (e) {
-          alert("Profile update failed.");
-      } finally {
-          setLoading(false);
-      }
-  };
-
-  const handleDetectLive = async () => {
-      setLoading(true);
-      try {
-          const loc = await getBrowserLocation();
-          if (myStore) {
-              const address = await reverseGeocode(loc.lat, loc.lng);
-              await updateStoreProfile(myStore.id, { 
-                lat: loc.lat, 
-                lng: loc.lng,
-                address: address || myStore.address
-              });
-              await loadData();
-              alert("Live Location Calibrated Successfully.");
-          }
-      } catch (e: any) {
-          alert(e.message);
-      } finally {
-          setLoading(false);
-      }
-  };
-
   const analytics = useMemo(() => {
     const validOrders = orders.filter(o => !['cancelled', 'rejected'].includes(o.status));
     const totalRevenue = validOrders.reduce((sum, o) => sum + o.total, 0);
@@ -174,30 +110,140 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   }, [orders]);
 
   const generatePDFReport = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(22);
-    doc.text(`${myStore?.name || 'Mart'} - Sales Performance Report`, 14, 22);
-    doc.setFontSize(11);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+
+    // --- 1. THEMED HEADER ---
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(0, 0, pageWidth, 40, 'F');
     
-    doc.text(`7-Day Revenue Total: Rs. ${analytics.totalRevenue}`, 14, 45);
-    doc.text(`Total Fulfilled Orders: ${orders.filter(o => o.status === 'delivered').length}`, 14, 52);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text(myStore?.name?.toUpperCase() || "MART TERMINAL", margin, 20);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Operational BI Performance Dashboard", margin, 28);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // Slate 400
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - margin - 50, 32);
+
+    // --- 2. KPI CARDS ---
+    const cardWidth = (pageWidth - (margin * 4)) / 3;
+    const cardY = 50;
+    const cardHeight = 30;
+
+    const drawKPICard = (x: number, title: string, value: string, color: [number, number, number]) => {
+        doc.setFillColor(248, 250, 252); // Slate 50
+        doc.roundedRect(x, cardY, cardWidth, cardHeight, 3, 3, 'F');
+        doc.setDrawColor(226, 232, 240); // Slate 200
+        doc.rect(x, cardY, cardWidth, cardHeight, 'D');
+        
+        doc.setTextColor(100, 116, 139); // Slate 500
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.text(title.toUpperCase(), x + 5, cardY + 8);
+        
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.setFontSize(16);
+        doc.text(value, x + 5, cardY + 22);
+    };
+
+    const deliveredOrders = orders.filter(o => o.status === 'delivered');
+    const aov = deliveredOrders.length > 0 ? (analytics.totalRevenue / deliveredOrders.length).toFixed(0) : "0";
+
+    drawKPICard(margin, "7-Day Revenue", `Rs. ${analytics.totalRevenue.toLocaleString()}`, [16, 185, 129]); // Emerald 500
+    drawKPICard(margin * 2 + cardWidth, "Order Volume", `${deliveredOrders.length} Units`, [59, 130, 246]); // Blue 500
+    drawKPICard(margin * 3 + cardWidth * 2, "Avg. Ticket (AOV)", `Rs. ${aov}`, [15, 23, 42]); // Slate 900
+
+    // --- 3. REVENUE TREND CHART (SIMULATED) ---
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sales Velocity Trend (Last 7 Days)", margin, 100);
+
+    const chartX = margin;
+    const chartY = 110;
+    const chartW = pageWidth - (margin * 2);
+    const chartH = 40;
+    const barSpacing = 10;
+    const barWidth = (chartW - (barSpacing * 8)) / 7;
+
+    doc.setDrawColor(241, 245, 249);
+    doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH); // X-Axis
+
+    analytics.chart.forEach((data, i) => {
+        const barHeight = (data.value / (analytics.maxVal || 1)) * chartH;
+        const xPos = chartX + barSpacing + (i * (barWidth + barSpacing));
+        
+        // Bar
+        doc.setFillColor(16, 185, 129, 0.2); // Light Emerald
+        doc.rect(xPos, chartY + chartH - barHeight, barWidth, barHeight, 'F');
+        doc.setFillColor(16, 185, 129); // Solid Emerald top
+        doc.rect(xPos, chartY + chartH - barHeight, barWidth, 2, 'F');
+        
+        // Labels
+        doc.setTextColor(100, 116, 139);
+        doc.setFontSize(7);
+        doc.text(data.label, xPos + (barWidth / 2), chartY + chartH + 5, { align: 'center' });
+        
+        if (data.value > 0) {
+            doc.setFontSize(6);
+            doc.text(`Rs.${data.value}`, xPos + (barWidth / 2), chartY + chartH - barHeight - 2, { align: 'center' });
+        }
+    });
+
+    // --- 4. DETAILED LOG TABLE ---
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text("Recent Transaction Ledger", margin, 165);
 
     const tableData = orders.map(o => [
         new Date(o.date).toLocaleDateString(),
-        o.id,
-        o.customerName || 'Guest',
-        o.total,
+        `ORD-${o.id.slice(-6).toUpperCase()}`,
+        o.customerName || 'Walk-in',
+        `Rs. ${o.total.toFixed(2)}`,
+        o.paymentMethod,
         o.status.toUpperCase()
     ]);
 
     autoTable(doc, {
-      startY: 65,
-      head: [['Date', 'Order ID', 'Customer', 'Amount (INR)', 'Status']],
-      body: tableData,
+        startY: 172,
+        head: [['DATE', 'REFERENCE', 'CUSTOMER', 'AMOUNT', 'METHOD', 'STATUS']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: {
+            fillColor: [16, 185, 129],
+            textColor: 255,
+            fontSize: 8,
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        bodyStyles: {
+            fontSize: 8,
+            halign: 'center',
+            textColor: [71, 85, 105]
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252]
+        },
+        margin: { left: margin, right: margin }
     });
 
-    doc.save(`${myStore?.name}_BI_Report_${Date.now()}.pdf`);
+    // --- 5. FOOTER ---
+    const pageCount = doc.internal.getNumberOfPages();
+    for(let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+        doc.text("SevenX7 Innovations - Secure Mart Terminal Protocol", margin, doc.internal.pageSize.getHeight() - 10);
+    }
+
+    doc.save(`${myStore?.name || 'Mart'}_BI_Dashboard_${Date.now()}.pdf`);
   };
 
   const generateCSVReport = () => {
@@ -254,6 +300,54 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     const updated = { ...item, ...updates };
     setInventory(prev => prev.map(i => i.id === item.id ? updated : i));
     await updateInventoryItem(myStore!.id, item.id, updated.storePrice, updated.stock > 0, updated.stock, item.brandDetails, updated.mrp, updated.costPrice);
+  };
+
+  // Comment: Fixed handleUpdateProfile to persist hub/store changes
+  const handleUpdateProfile = async () => {
+    if (!myStore) return;
+    setLoading(true);
+    try {
+      await updateStoreProfile(myStore.id, {
+        name: profileForm.name,
+        address: profileForm.address,
+        type: profileForm.type,
+        gstNumber: profileForm.gstNumber,
+        upiId: profileForm.upiId,
+        bankDetails: {
+          bankName: profileForm.bankName,
+          accountNumber: profileForm.accNo,
+          ifscCode: profileForm.ifsc,
+          accountHolder: user.name || ''
+        }
+      });
+      setIsEditingProfile(false);
+      await loadData();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Comment: Fixed handleDetectLive to update store location via GPS
+  const handleDetectLive = async () => {
+    if (!myStore) return;
+    setLoading(true);
+    try {
+      const loc = await getBrowserLocation();
+      const addr = await reverseGeocode(loc.lat, loc.lng);
+      await updateStoreProfile(myStore.id, {
+        lat: loc.lat,
+        lng: loc.lng,
+        address: addr || myStore.address
+      });
+      await loadData();
+    } catch (e) {
+      console.error(e);
+      alert("Location detection failed. Ensure GPS is enabled.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

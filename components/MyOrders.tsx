@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Order, Store, OrderMode } from '../types';
 import { MapVisualizer } from './MapVisualizer';
 import { getUserOrders, subscribeToUserOrders } from '../services/orderService';
+import { getBrowserLocation } from '../services/locationService';
 
 interface MyOrdersProps {
   userLocation: { lat: number; lng: number } | null;
@@ -19,12 +20,21 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
+  const [realTimeUserLoc, setRealTimeUserLoc] = useState<{lat: number, lng: number} | null>(null);
 
   // Animation Tick for Live Driver Movement
   useEffect(() => {
       const interval = setInterval(() => setTick(t => t + 1), 1000);
       return () => clearInterval(interval);
   }, []);
+
+  // Attempt to get real browser location for Demo simulation accuracy
+  useEffect(() => {
+      if (userId?.includes('demo')) {
+          getBrowserLocation().then(loc => setRealTimeUserLoc({ lat: loc.lat, lng: loc.lng }))
+                             .catch(() => {}); // Fallback handled in simulation
+      }
+  }, [userId]);
 
   // Fetch Orders on Mount or userId change
   useEffect(() => {
@@ -86,51 +96,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
 
   }, [userId]);
 
-  // Simulator for status updates (ONLY for Demo Mode)
-  useEffect(() => {
-    if (!userId || !userId.includes('demo')) return;
-
-    const interval = setInterval(() => {
-      setOrders(prevOrders => {
-        const updatedOrders = prevOrders.map((o): Order => {
-            if (o.deliveryType === 'SCHEDULED' && o.paymentStatus === 'PENDING') return o;
-            if (o.status === 'cancelled' || o.status === 'delivered' || o.status === 'picked_up') return o;
-
-            if (o.status === 'placed') return { ...o, status: 'packing' };
-            if (o.status === 'packing') return { ...o, status: o.mode === 'DELIVERY' ? 'on_way' : 'ready' };
-            if (o.status === 'on_way') return { ...o, status: 'delivered' };
-            if (o.status === 'ready') return { ...o, status: 'picked_up' };
-            return o;
-        });
-        localStorage.setItem('grocesphere_orders', JSON.stringify(updatedOrders));
-        return updatedOrders;
-      });
-    }, 15000); 
-
-    return () => clearInterval(interval);
-  }, [userId]);
-
-  if (loading) {
-    return (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in">
-            <div className="w-12 h-12 border-4 border-slate-200 border-t-brand-DEFAULT rounded-full animate-spin mb-4"></div>
-            <p className="text-slate-400 font-bold text-sm">Loading History...</p>
-        </div>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center px-6 animate-fade-in">
-        <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-5xl mb-6 shadow-soft text-slate-300 border border-slate-100">
-           🧾
-        </div>
-        <h3 className="text-xl font-black text-slate-800">No Past Orders</h3>
-        <p className="text-slate-400 mt-2 font-medium max-w-[200px] mx-auto">Your order history will appear here once you make a purchase.</p>
-      </div>
-    );
-  }
-
   const getStatusInfo = (status: string, mode: OrderMode) => {
       const deliverySteps = ['placed', 'packing', 'on_way', 'delivered'];
       const pickupSteps = ['placed', 'packing', 'ready', 'picked_up'];
@@ -167,23 +132,25 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
           return order.driverLocation;
       }
 
-      // 2. FOR DEMO MODE: MOCK SIMULATION
+      // 2. FOR DEMO MODE: MOCK SIMULATION WITH REAL-TIME ANCHOR
       const isLiveTracking = order.status === 'on_way' || order.status === 'packing';
-      if (!isLiveTracking || !order.storeLocation || !order.userLocation) return undefined;
+      if (!isLiveTracking || !order.storeLocation) return undefined;
       
-      if (!isValidCoord(order.storeLocation.lat) || !isValidCoord(order.storeLocation.lng) ||
-          !isValidCoord(order.userLocation.lat) || !isValidCoord(order.userLocation.lng)) return undefined;
+      // Use real browser location as destination if available, otherwise fallback to store offset
+      const destination = realTimeUserLoc || order.userLocation || { lat: order.storeLocation.lat + 0.01, lng: order.storeLocation.lng + 0.01 };
 
-      const loopDuration = 30; 
-      const offset = order.id.length; 
+      if (!isValidCoord(order.storeLocation.lat) || !isValidCoord(order.storeLocation.lng) ||
+          !isValidCoord(destination.lat) || !isValidCoord(destination.lng)) return undefined;
+
+      const loopDuration = 60; 
+      const offset = order.id.length * 2; 
       const t = (tick + offset) % loopDuration;
       const progress = t / loopDuration;
 
       // Phase 1: Rider -> Store (Pickup)
       if (order.status === 'packing') {
-          // Mocking a Rider Hub starting point 1km away
-          const startLat = order.storeLocation.lat + 0.008;
-          const startLng = order.storeLocation.lng + 0.008;
+          const startLat = order.storeLocation.lat + 0.005;
+          const startLng = order.storeLocation.lng + 0.005;
           return {
               lat: startLat + (order.storeLocation.lat - startLat) * progress,
               lng: startLng + (order.storeLocation.lng - startLng) * progress
@@ -191,8 +158,8 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       }
 
       // Phase 2: Store -> User (Delivery)
-      const lat = order.storeLocation.lat + (order.userLocation.lat - order.storeLocation.lat) * progress;
-      const lng = order.storeLocation.lng + (order.userLocation.lng - order.storeLocation.lng) * progress;
+      const lat = order.storeLocation.lat + (destination.lat - order.storeLocation.lat) * progress;
+      const lng = order.storeLocation.lng + (destination.lng - order.storeLocation.lng) * progress;
       
       return { lat, lng };
   };
@@ -201,7 +168,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
     <div className="pb-32 px-5 space-y-6 pt-4">
       <div className="flex items-center justify-between">
          <h2 className="font-black text-slate-800 text-2xl">History</h2>
-         {userId?.includes('demo') && <span className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">Demo Mode</span>}
+         {userId?.includes('demo') && <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100 animate-pulse">Live Demo Tracking</span>}
          {userId && !userId.includes('demo') && <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded animate-pulse">● Live Updates</span>}
       </div>
       
@@ -209,7 +176,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         const isExpanded = expandedOrderId === order.id;
         const isCompleted = order.status === 'delivered' || order.status === 'picked_up';
         const isCancelled = order.status === 'cancelled';
-        const isPickup = order.mode === 'PICKUP';
         const isPaymentPending = order.paymentStatus === 'PENDING';
         
         const { steps, currentIndex, progress, getLabel, getIcon } = getStatusInfo(order.status, order.mode);
@@ -294,9 +260,6 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                                         <div className={`text-[9px] font-bold uppercase mt-2 transition-colors ${isActive ? 'text-brand-dark' : isDone ? 'text-brand-DEFAULT' : 'text-slate-300'}`}>
                                             {getLabel(step)}
                                         </div>
-                                        {isActive && (
-                                            <div className="absolute top-0 w-8 h-8 bg-brand-DEFAULT rounded-full animate-ping -z-10 opacity-30"></div>
-                                        )}
                                     </div>
                                 );
                             })}
@@ -312,23 +275,14 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                             <MapVisualizer
                                 stores={[mapStore]}
                                 selectedStore={mapStore}
-                                userLat={isValidCoord(userLocation?.lat) ? userLocation!.lat : 12.9716}
-                                userLng={isValidCoord(userLocation?.lng) ? userLocation!.lng : 77.5946}
+                                userLat={realTimeUserLoc?.lat || isValidCoord(userLocation?.lat) ? userLocation!.lat : 12.9716}
+                                userLng={realTimeUserLoc?.lng || isValidCoord(userLocation?.lng) ? userLocation!.lng : 77.5946}
                                 mode={order.mode}
                                 onSelectStore={() => {}}
                                 showRoute={true}
-                                enableExternalNavigation={isPickup}
                                 className="h-full"
                                 driverLocation={driverPos}
                             />
-                            {isRealUser && !order.driverLocation && (order.status === 'on_way' || order.status === 'packing') && (
-                                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6 text-center z-50">
-                                    <div className="bg-white p-4 rounded-2xl shadow-xl">
-                                        <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Awaiting Live GPS Signal...</p>
-                                        <p className="text-[8px] text-slate-400 font-bold mt-1">Rider assigned. Positioning will sync shortly.</p>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                     <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Order Items</h4>

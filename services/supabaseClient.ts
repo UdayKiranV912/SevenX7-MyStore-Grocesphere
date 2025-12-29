@@ -1,7 +1,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://tvywzlolrjukfkukxjpr.supabase.co';
-const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY || 'sb_publishable_LdempZ18AsyBTVrBI8wkHw_E-sq5GQb';
+// Project credentials provided by user
+const supabaseUrl = 'https://tsadkqjvcdhjdqrwurbx.supabase.co';
+const supabaseKey = 'sb_publishable_CZnad3HNfL14Ov2bKpu7nQ_bGyh7jmr';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

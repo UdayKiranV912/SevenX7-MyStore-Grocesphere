@@ -93,8 +93,9 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
 };
 
 export const subscribeToUserOrders = (userId: string, onUpdate: (payload: any) => void) => {
+    // Ensuring the subscription captures GPS updates (driver_lat, driver_lng)
     return supabase
-        .channel(`user-orders-${userId}`)
+        .channel(`user-orders-live-${userId}`)
         .on('postgres_changes', { 
             event: 'UPDATE', 
             schema: 'public', 
