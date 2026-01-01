@@ -17,7 +17,6 @@ export const registerUser = async (
     storeName?: string,
     storeAddress?: string
 ): Promise<UserState> => {
-    // Comment: Bypass SupabaseAuthClient type resolution error for signUp method
     const { data: authData, error: authError } = await (supabase.auth as any).signUp({
         email,
         password,
@@ -32,7 +31,6 @@ export const registerUser = async (
     if (authError) throw authError;
     if (!authData.user) throw new Error("Registration failed.");
 
-    // 1. Create the Profile with 'pending' status
     const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -42,12 +40,11 @@ export const registerUser = async (
             phone_number: phone,
             role: role,
             upi_id: upiId,
-            verification_status: 'pending' // Enforce pending status
+            verification_status: 'pending'
         });
 
     if (profileError) throw profileError;
 
-    // 2. If Partner, initialize their Store immediately with 'pending' status
     if (role === 'store_owner' && storeName) {
         await supabase
             .from('stores')
@@ -56,7 +53,7 @@ export const registerUser = async (
                 name: storeName,
                 address: storeAddress || 'Address Pending',
                 upi_id: upiId,
-                is_open: false, // Keep closed until approved
+                is_open: false,
                 verification_status: 'pending',
                 type: 'Local Mart',
                 rating: 5.0,
@@ -66,7 +63,7 @@ export const registerUser = async (
     }
 
     return {
-        isAuthenticated: false, // Do not authenticate yet
+        isAuthenticated: true, 
         id: authData.user.id,
         phone: phone,
         email: email,
@@ -76,12 +73,11 @@ export const registerUser = async (
         location: null,
         role: role,
         upiId: upiId,
-        verificationStatus: 'pending'
+        verification_status: 'pending'
     };
 };
 
 export const loginUser = async (email: string, password: string): Promise<UserState> => {
-    // Comment: Bypass SupabaseAuthClient type resolution error for signInWithPassword method
     const { data: authData, error: authError } = await (supabase.auth as any).signInWithPassword({
         email,
         password
@@ -100,13 +96,7 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         throw new Error("Profile not found.");
     }
 
-    // CHECK FOR ADMIN APPROVAL
-    if (profileData.verification_status !== 'verified') {
-        const error: any = new Error("Your account is awaiting Super Admin approval.");
-        error.status = profileData.verification_status;
-        throw error;
-    }
-
+    // We return the user even if pending so the App can listen for real-time verification status changes
     return {
         isAuthenticated: true,
         id: profileData.id,
@@ -118,7 +108,7 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         location: null,
         role: profileData.role as any,
         upiId: profileData.upi_id,
-        verificationStatus: profileData.verification_status as any,
+        verification_status: profileData.verification_status as any,
         gstNumber: profileData.gst_number || '',
         licenseNumber: profileData.license_number || ''
     };
