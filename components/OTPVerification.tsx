@@ -1,17 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { registerUser, loginUser } from '../services/userService';
 import { UserState } from '../types';
 import SevenX7Logo from './SevenX7Logo';
+import { supabase } from '../services/supabaseClient';
 
 interface AuthProps {
   onLoginSuccess: (user: UserState) => void;
-  onDemoLogin: () => void;
-  onCustomerDemoLogin: () => void;
+  onDemoStore: () => void;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
-  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER' | 'VERIFY' | 'PENDING'>('LOGIN');
+export const Auth: React.FC<AuthProps> = ({ 
+  onLoginSuccess, 
+  onDemoStore
+}) => {
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER' | 'VERIFY' | 'PENDING' | 'UNLOCKED'>('LOGIN');
   const [verificationCode, setVerificationCode] = useState('');
   const [formData, setFormData] = useState({ 
     fullName: '', 
@@ -25,13 +28,48 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
   });
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [tempUserId, setTempUserId] = useState<string | null>(null);
+
+  // REAL-TIME APPROVAL LISTENER
+  useEffect(() => {
+    if (authMode === 'PENDING' && tempUserId) {
+        const channel = supabase
+            .channel(`public:profiles:id=eq.${tempUserId}`)
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'profiles',
+                filter: `id=eq.${tempUserId}`
+            }, (payload) => {
+                if (payload.new.verification_status === 'verified') {
+                    setAuthMode('UNLOCKED');
+                    setTimeout(() => {
+                        handleAutoLoginAfterApproval();
+                    }, 1500);
+                }
+            })
+            .subscribe();
+
+        return () => { channel.unsubscribe(); };
+    }
+  }, [authMode, tempUserId]);
+
+  const handleAutoLoginAfterApproval = async () => {
+      try {
+          const user = await loginUser(formData.email, formData.password);
+          onLoginSuccess(user);
+      } catch (e) {
+          console.error("Auto-login failed:", e);
+          setAuthMode('LOGIN');
+      }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
       e.preventDefault();
       setErrorMsg('');
       setLoading(true);
       try {
-          await registerUser(
+          const user = await registerUser(
               formData.email, 
               formData.password, 
               formData.fullName, 
@@ -41,6 +79,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
               formData.storeName,
               formData.storeAddress
           );
+          setTempUserId(user.id || null);
           setLoading(false);
           setAuthMode('VERIFY'); 
       } catch (err: any) {
@@ -58,6 +97,7 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
           onLoginSuccess(user);
       } catch (err: any) {
           if (err.message.includes('approval') || err.status === 'pending') {
+              setTempUserId(err.userId || null); 
               setAuthMode('PENDING');
           } else {
               setErrorMsg(err.message || 'Invalid Credentials');
@@ -82,7 +122,17 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3">Partner Terminal Portal</p>
         </div>
 
-        <div className="w-full bg-white border border-slate-100 p-8 rounded-[3.5rem] shadow-soft-xl animate-slide-up relative">
+        <div className="w-full bg-white border border-slate-100 p-8 rounded-[3.5rem] shadow-soft-xl animate-slide-up relative overflow-hidden">
+            {authMode === 'UNLOCKED' && (
+                <div className="absolute inset-0 bg-emerald-500 z-[100] flex flex-col items-center justify-center text-white animate-fade-in">
+                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 animate-bounce shadow-2xl">
+                        <span className="text-4xl">🎉</span>
+                    </div>
+                    <h2 className="text-2xl font-black tracking-tight">Access Granted</h2>
+                    <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-70">Initializing Terminal...</p>
+                </div>
+            )}
+
             {(authMode === 'LOGIN' || authMode === 'REGISTER') && (
                 <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8 relative z-10">
                     <button onClick={() => setAuthMode('LOGIN')} className={`flex-1 py-3 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest ${authMode === 'LOGIN' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Sign In</button>
@@ -153,13 +203,12 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
                             </div>
                             <div>
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Audit in Progress</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] leading-relaxed">Your merchant profile is under review.<br/>Access will be granted upon<br/>Super Admin approval.</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] leading-relaxed">Your merchant profile is under review.<br/>The terminal will activate automatically<br/>upon Super Admin approval.</p>
                             </div>
                             <div className="bg-slate-50 p-4 rounded-2xl flex items-center gap-3 border border-slate-100">
                                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Global Sync Status: 98%</span>
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Awaiting Live Handshake...</span>
                             </div>
-                            <button onClick={() => window.location.reload()} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl">Refresh Terminal Status</button>
                         </div>
                     )}
                 </div>
@@ -167,9 +216,11 @@ export const Auth: React.FC<AuthProps> = ({ onLoginSuccess, onDemoLogin }) => {
         </div>
 
         {(authMode === 'LOGIN' || authMode === 'REGISTER') && (
-            <div className="mt-12 flex flex-col gap-4 w-full">
-                <button onClick={onDemoLogin} className="w-full py-5 bg-white border-2 border-slate-100 rounded-[2rem] text-[9px] font-black text-slate-400 uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-500 transition-all">Explore Demo Terminal</button>
-                <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.3em] text-center mt-2">© SevenX7 Innovations</p>
+            <div className="mt-8 flex flex-col gap-4 w-full animate-fade-in">
+                <button onClick={onDemoStore} className="w-full py-5 bg-white border-2 border-slate-100 rounded-[2rem] text-[9px] font-black text-slate-400 uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-500 transition-all shadow-sm">Explore Demo Terminal</button>
+                <div className="pt-4 text-center">
+                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.3em]">© SevenX7 Innovations</p>
+                </div>
             </div>
         )}
       </div>

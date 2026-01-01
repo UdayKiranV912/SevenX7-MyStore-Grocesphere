@@ -98,6 +98,7 @@ export interface SavedCard {
 
 export interface UserState {
   isAuthenticated: boolean;
+  isDemo?: boolean;
   id?: string;
   phone: string;
   email?: string;
@@ -106,6 +107,7 @@ export interface UserState {
   location: { lat: number; lng: number } | null;
   savedCards?: SavedCard[];
   role?: 'customer' | 'store_owner' | 'delivery_partner' | 'admin' | 'super_admin';
+  verification_status?: 'pending' | 'verified' | 'rejected';
   verificationStatus?: 'pending' | 'verified' | 'rejected';
   gstNumber?: string;
   licenseNumber?: string;
