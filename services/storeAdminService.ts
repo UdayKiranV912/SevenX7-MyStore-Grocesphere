@@ -64,11 +64,23 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
 
 export const subscribeToStoreOrders = (storeId: string, onUpdate: () => void) => {
     return supabase
-        .channel(`store-realtime-${storeId}`)
+        .channel(`store-orders-realtime-${storeId}`)
         .on('postgres_changes', { 
             event: '*', 
             schema: 'public', 
             table: 'orders', 
+            filter: `store_id=eq.${storeId}` 
+        }, () => onUpdate())
+        .subscribe();
+};
+
+export const subscribeToStoreInventory = (storeId: string, onUpdate: () => void) => {
+    return supabase
+        .channel(`store-inventory-realtime-${storeId}`)
+        .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'inventory', 
             filter: `store_id=eq.${storeId}` 
         }, () => onUpdate())
         .subscribe();
@@ -79,7 +91,6 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
       const saved = localStorage.getItem(DEMO_ORDERS_KEY);
       if (saved) return JSON.parse(saved);
       
-      // Generate standard demo set if nothing exists
       const mockOrders: Order[] = [
         {
           id: 'demo-ord-live-1',
@@ -97,19 +108,6 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
           storeName: 'Grocesphere Demo Mart',
           customerName: 'Arjun Mehra',
           userLocation: { lat: 12.9780, lng: 77.6450 }
-        },
-        {
-            id: 'demo-ord-hist-1',
-            date: new Date(Date.now() - 86400000).toISOString(),
-            items: [{ ...INITIAL_PRODUCTS[5], quantity: 5, selectedBrand: 'Generic', originalProductId: '6', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }],
-            total: 200,
-            status: 'delivered',
-            paymentStatus: 'PAID',
-            paymentMethod: 'ONLINE',
-            mode: 'DELIVERY',
-            deliveryType: 'INSTANT',
-            storeName: 'Grocesphere Demo Mart',
-            customerName: 'Priya Sharma'
         }
       ];
       localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(mockOrders));
@@ -211,16 +209,16 @@ export const updateStoreProfile = async (storeId: string, updates: Partial<Store
         }
         return;
     }
-    const dbPayload: any = {
-        name: updates.name,
-        address: updates.address,
-        type: updates.type,
-        gst_number: updates.gstNumber,
-        upi_id: updates.upiId,
-        bank_details: updates.bankDetails,
-        lat: updates.lat,
-        lng: updates.lng
-    };
+    const dbPayload: any = {};
+    if (updates.name) dbPayload.name = updates.name;
+    if (updates.address) dbPayload.address = updates.address;
+    if (updates.type) dbPayload.type = updates.type;
+    if (updates.gstNumber) dbPayload.gst_number = updates.gstNumber;
+    if (updates.upiId) dbPayload.upi_id = updates.upiId;
+    if (updates.bankDetails) dbPayload.bank_details = updates.bankDetails;
+    if (updates.lat) dbPayload.lat = updates.lat;
+    if (updates.lng) dbPayload.lng = updates.lng;
+    
     await supabase.from('stores').update(dbPayload).eq('id', storeId);
 };
 

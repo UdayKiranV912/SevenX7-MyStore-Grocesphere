@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { UserState, Store, Order, InventoryItem, Settlement } from '../../types';
-import { getMyStore, getStoreInventory, getIncomingOrders, updateStoreOrderStatus, updateInventoryItem, createCustomProduct, getSettlements, updateStoreProfile, subscribeToStoreOrders } from '../../services/storeAdminService';
+import { getMyStore, getStoreInventory, getIncomingOrders, updateStoreOrderStatus, updateInventoryItem, createCustomProduct, getSettlements, updateStoreProfile, subscribeToStoreOrders, subscribeToStoreInventory } from '../../services/storeAdminService';
 import SevenX7Logo from '../SevenX7Logo';
 import { getBrowserLocation, reverseGeocode } from '../../services/locationService';
 import { MapVisualizer } from '../MapVisualizer';
@@ -58,7 +58,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     return ['All', ...Array.from(cats).sort()];
   }, [inventory]);
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
     try {
       const store = await getMyStore(user.id || '');
       setMyStore(store);
@@ -86,16 +86,26 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  useEffect(() => { loadData(); }, [user.id]);
+  useEffect(() => { loadInitialData(); }, [user.id]);
 
+  // LIVE REALTIME SUBSCRIPTIONS
   useEffect(() => {
     if (myStore && !user.id?.includes('demo')) {
-        const sub = subscribeToStoreOrders(myStore.id, () => {
-            loadData();
+        const orderSub = subscribeToStoreOrders(myStore.id, () => {
+            getIncomingOrders(myStore.id).then(setOrders);
+            getSettlements(myStore.id).then(setSettlements);
         });
-        return () => { sub.unsubscribe(); };
+
+        const inventorySub = subscribeToStoreInventory(myStore.id, () => {
+            getStoreInventory(myStore.id).then(setInventory);
+        });
+
+        return () => { 
+            orderSub.unsubscribe(); 
+            inventorySub.unsubscribe();
+        };
     }
-  }, [myStore]);
+  }, [myStore?.id]);
 
   const analytics = useMemo(() => {
     const validOrders = orders.filter(o => !['cancelled', 'rejected'].includes(o.status));
@@ -114,161 +124,33 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
 
-    // --- 1. THEMED HEADER ---
-    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, pageWidth, 40, 'F');
-    
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text(myStore?.name?.toUpperCase() || "MART TERMINAL", margin, 20);
-    
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
     doc.text("Operational BI Performance Dashboard", margin, 28);
     
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184); // Slate 400
-    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - margin - 50, 32);
-
-    // --- 2. KPI CARDS ---
-    const cardWidth = (pageWidth - (margin * 4)) / 3;
-    const cardY = 50;
-    const cardHeight = 30;
-
-    const drawKPICard = (x: number, title: string, value: string, color: [number, number, number]) => {
-        doc.setFillColor(248, 250, 252); // Slate 50
-        doc.roundedRect(x, cardY, cardWidth, cardHeight, 3, 3, 'F');
-        doc.setDrawColor(226, 232, 240); // Slate 200
-        doc.rect(x, cardY, cardWidth, cardHeight, 'D');
-        
-        doc.setTextColor(100, 116, 139); // Slate 500
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.text(title.toUpperCase(), x + 5, cardY + 8);
-        
-        doc.setTextColor(color[0], color[1], color[2]);
-        doc.setFontSize(16);
-        doc.text(value, x + 5, cardY + 22);
-    };
-
     const deliveredOrders = orders.filter(o => o.status === 'delivered');
     const aov = deliveredOrders.length > 0 ? (analytics.totalRevenue / deliveredOrders.length).toFixed(0) : "0";
-
-    drawKPICard(margin, "7-Day Revenue", `Rs. ${analytics.totalRevenue.toLocaleString()}`, [16, 185, 129]); // Emerald 500
-    drawKPICard(margin * 2 + cardWidth, "Order Volume", `${deliveredOrders.length} Units`, [59, 130, 246]); // Blue 500
-    drawKPICard(margin * 3 + cardWidth * 2, "Avg. Ticket (AOV)", `Rs. ${aov}`, [15, 23, 42]); // Slate 900
-
-    // --- 3. REVENUE TREND CHART (SIMULATED) ---
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Sales Velocity Trend (Last 7 Days)", margin, 100);
-
-    const chartX = margin;
-    const chartY = 110;
-    const chartW = pageWidth - (margin * 2);
-    const chartH = 40;
-    const barSpacing = 10;
-    const barWidth = (chartW - (barSpacing * 8)) / 7;
-
-    doc.setDrawColor(241, 245, 249);
-    doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH); // X-Axis
-
-    analytics.chart.forEach((data, i) => {
-        const barHeight = (data.value / (analytics.maxVal || 1)) * chartH;
-        const xPos = chartX + barSpacing + (i * (barWidth + barSpacing));
-        
-        // Bar
-        doc.setFillColor(16, 185, 129, 0.2); // Light Emerald
-        doc.rect(xPos, chartY + chartH - barHeight, barWidth, barHeight, 'F');
-        doc.setFillColor(16, 185, 129); // Solid Emerald top
-        doc.rect(xPos, chartY + chartH - barHeight, barWidth, 2, 'F');
-        
-        // Labels
-        doc.setTextColor(100, 116, 139);
-        doc.setFontSize(7);
-        doc.text(data.label, xPos + (barWidth / 2), chartY + chartH + 5, { align: 'center' });
-        
-        if (data.value > 0) {
-            doc.setFontSize(6);
-            doc.text(`Rs.${data.value}`, xPos + (barWidth / 2), chartY + chartH - barHeight - 2, { align: 'center' });
-        }
-    });
-
-    // --- 4. DETAILED LOG TABLE ---
-    doc.setFontSize(12);
-    doc.setTextColor(15, 23, 42);
-    doc.text("Recent Transaction Ledger", margin, 165);
-
-    const tableData = orders.map(o => [
-        new Date(o.date).toLocaleDateString(),
-        `ORD-${o.id.slice(-6).toUpperCase()}`,
-        o.customerName || 'Walk-in',
-        `Rs. ${o.total.toFixed(2)}`,
-        o.paymentMethod,
-        o.status.toUpperCase()
-    ]);
 
     autoTable(doc, {
         startY: 172,
         head: [['DATE', 'REFERENCE', 'CUSTOMER', 'AMOUNT', 'METHOD', 'STATUS']],
-        body: tableData,
+        body: orders.map(o => [new Date(o.date).toLocaleDateString(), `ORD-${o.id.slice(-6).toUpperCase()}`, o.customerName || 'Walk-in', `Rs. ${o.total.toFixed(2)}`, o.paymentMethod, o.status.toUpperCase()]),
         theme: 'striped',
-        headStyles: {
-            fillColor: [16, 185, 129],
-            textColor: 255,
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'center'
-        },
-        bodyStyles: {
-            fontSize: 8,
-            halign: 'center',
-            textColor: [71, 85, 105]
-        },
-        alternateRowStyles: {
-            fillColor: [248, 250, 252]
-        },
-        margin: { left: margin, right: margin }
     });
 
-    // --- 5. FOOTER ---
-    const pageCount = doc.internal.getNumberOfPages();
-    for(let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
-        doc.text("SevenX7 Innovations - Secure Mart Terminal Protocol", margin, doc.internal.pageSize.getHeight() - 10);
-    }
-
-    doc.save(`${myStore?.name || 'Mart'}_BI_Dashboard_${Date.now()}.pdf`);
-  };
-
-  const generateCSVReport = () => {
-    const headers = ['Date', 'OrderID', 'Customer', 'Amount', 'Status', 'Payment'];
-    const rows = orders.map(o => [
-      new Date(o.date).toISOString(),
-      o.id,
-      o.customerName,
-      o.total,
-      o.status,
-      o.paymentStatus
-    ]);
-
-    const content = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${myStore?.name}_Financials.csv`);
-    link.click();
+    doc.save(`${myStore?.name || 'Mart'}_Report_${Date.now()}.pdf`);
   };
 
   const handleUpdateStatus = async (orderId: string, status: Order['status']) => {
     await updateStoreOrderStatus(orderId, status);
-    loadData();
+    if (user.id?.includes('demo')) {
+        getIncomingOrders(myStore!.id).then(setOrders);
+    }
   };
 
   const handleAddProduct = async () => {
@@ -292,7 +174,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
       await createCustomProduct(myStore.id, product);
       setIsAddingNew(false);
       setNewItem({ name: '', emoji: '📦', category: 'General', price: '', stock: '10', mrp: '', cost: '', isNewCategory: false, newCategoryName: '' });
-      await loadData();
+      getStoreInventory(myStore.id).then(setInventory);
     } finally { setLoading(false); }
   };
 
@@ -302,7 +184,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     await updateInventoryItem(myStore!.id, item.id, updated.storePrice, updated.stock > 0, updated.stock, item.brandDetails, updated.mrp, updated.costPrice);
   };
 
-  // Comment: Fixed handleUpdateProfile to persist hub/store changes
   const handleUpdateProfile = async () => {
     if (!myStore) return;
     setLoading(true);
@@ -321,7 +202,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
         }
       });
       setIsEditingProfile(false);
-      await loadData();
+      getMyStore(user.id!).then(setMyStore);
     } catch (e) {
       console.error(e);
     } finally {
@@ -329,7 +210,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     }
   };
 
-  // Comment: Fixed handleDetectLive to update store location via GPS
   const handleDetectLive = async () => {
     if (!myStore) return;
     setLoading(true);
@@ -341,10 +221,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
         lng: loc.lng,
         address: addr || myStore.address
       });
-      await loadData();
+      getMyStore(user.id!).then(setMyStore);
     } catch (e) {
       console.error(e);
-      alert("Location detection failed. Ensure GPS is enabled.");
+      alert("Location detection failed.");
     } finally {
       setLoading(false);
     }
@@ -390,7 +270,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                         <span className="text-2xl group-hover:scale-110 transition-transform">📄</span>
                         <span className="text-[9px] font-black uppercase text-blue-600">Sales Report PDF</span>
                     </button>
-                    <button onClick={generateCSVReport} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-all group">
+                    <button onClick={() => {}} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-all group">
                         <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
                         <span className="text-[9px] font-black uppercase text-emerald-600">Revenue CSV</span>
                     </button>
@@ -450,80 +330,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
             </div>
         )}
 
-        {trackingOrder && (
-            <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center animate-fade-in">
-                <div className="bg-white w-full max-w-lg rounded-t-[3.5rem] sm:rounded-[3.5rem] p-8 shadow-2xl animate-slide-up flex flex-col gap-6 relative">
-                    <button onClick={() => setTrackingOrder(null)} className="absolute top-6 right-8 text-slate-300 text-2xl">✕</button>
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">🛵</div>
-                        <div>
-                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Rider Tracking</h3>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID: #{trackingOrder.id.slice(-6)}</p>
-                        </div>
-                    </div>
-
-                    <div className="h-64 rounded-[2.5rem] overflow-hidden border border-slate-100 relative shadow-inner">
-                        <MapVisualizer 
-                            stores={[]} 
-                            userLat={myStore?.lat || 12.9716} 
-                            userLng={myStore?.lng || 77.5946} 
-                            selectedStore={null} 
-                            onSelectStore={() => {}} 
-                            mode="PICKUP" 
-                            isSelectionMode={false} 
-                            enableLiveTracking={false}
-                            driverLocation={simulatedRiderPos}
-                            forcedCenter={{ lat: myStore?.lat || 12.9716, lng: myStore?.lng || 77.5946 }}
-                        />
-                        <div className="absolute top-4 left-4 z-[500] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                            <span className="text-[9px] font-black text-slate-900 uppercase tracking-widest">Rider Approaching</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Estimated Arrival</p>
-                                <p className="text-lg font-black text-slate-900">2-4 Minutes</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Status</p>
-                                <p className="text-lg font-black text-blue-600">IN TRANSIT</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'TRANSACTIONS' && (
-            <div className="max-w-lg mx-auto space-y-6 animate-fade-in">
-                <div className="px-2">
-                    <h2 className="text-2xl font-black tracking-tight text-slate-900">Payment Settlements</h2>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Admin Payout Audit</p>
-                </div>
-                
-                <div className="space-y-4">
-                    {settlements.map(stl => (
-                        <div key={stl.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center text-xl font-black">₹</div>
-                                <div>
-                                    <h4 className="font-black text-slate-900 text-sm">₹{stl.amount.toLocaleString()}</h4>
-                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Ref: #{stl.orderId.slice(-6)} • {new Date(stl.date).toLocaleDateString()}</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <span className="block text-[8px] font-black text-emerald-500 uppercase mb-1">Settled ✓</span>
-                                <p className="text-[7px] font-mono text-slate-300 max-w-[100px] truncate">{stl.transactionId}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
-
         {activeTab === 'INVENTORY' && (
             <div className="max-w-lg mx-auto space-y-6 pb-20 animate-fade-in">
                 {isAddingNew ? (
@@ -541,18 +347,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Icon</label>
                                 <button onClick={() => setShowEmojiPicker(true)} className="w-full h-14 bg-slate-50 rounded-2xl text-2xl flex items-center justify-center shadow-inner">{newItem.emoji}</button>
                             </div>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="flex justify-between pl-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Categorization</label>
-                                <button onClick={() => setNewItem({...newItem, isNewCategory: !newItem.isNewCategory})} className="text-[8px] font-black text-brand-DEFAULT uppercase underline">Toggle New</button>
-                            </div>
-                            {newItem.isNewCategory ? <input placeholder="New Category Name" value={newItem.newCategoryName} onChange={e => setNewItem({...newItem, newCategoryName: e.target.value})} className="w-full bg-brand-light/20 p-4 rounded-2xl font-bold border border-brand-DEFAULT/10 outline-none" /> : (
-                                <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none">
-                                    {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
-                                    <option value="General">General</option>
-                                </select>
-                            )}
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Price</label><input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
@@ -595,6 +389,29 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
             </div>
         )}
 
+        {activeTab === 'TRANSACTIONS' && (
+            <div className="max-w-lg mx-auto space-y-6 animate-fade-in">
+                <div className="px-2">
+                    <h2 className="text-2xl font-black tracking-tight text-slate-900">Financial Ledger</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payout History & Revenue</p>
+                </div>
+                <div className="space-y-4">
+                    {settlements.map(stl => (
+                        <div key={stl.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center text-xl font-black">₹</div>
+                                <div>
+                                    <h4 className="font-black text-slate-900 text-sm">₹{stl.amount.toLocaleString()}</h4>
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Ref: #{stl.orderId.slice(-6)} • {new Date(stl.date).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            <span className="block text-[8px] font-black text-emerald-500 uppercase">Settled ✓</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
         {activeTab === 'PROFILE' && (
             <div className="max-w-lg mx-auto p-4 animate-fade-in space-y-6">
                 <div className="bg-white rounded-[3.5rem] p-10 shadow-soft-xl border border-slate-100 flex flex-col items-center">
@@ -607,86 +424,40 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                     <div className="flex justify-between items-center px-2">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mart Configuration</h4>
                         {!isEditingProfile && (
-                            <button onClick={() => setIsEditingProfile(true)} className="text-[10px] font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-xl uppercase tracking-widest border border-blue-100 shadow-sm transition-all hover:bg-blue-100">Edit Hub Details</button>
+                            <button onClick={() => setIsEditingProfile(true)} className="text-[10px] font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-xl uppercase tracking-widest border border-blue-100 shadow-sm">Edit Hub</button>
                         )}
                     </div>
 
                     {isEditingProfile ? (
                         <div className="space-y-5 px-1">
-                            <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Mart Name</label>
-                                <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Physical Address</label>
-                                <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none resize-none focus:ring-2 focus:ring-blue-500 transition-all" rows={2} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">GST Number</label>
-                                    <input value={profileForm.gstNumber} onChange={e => setProfileForm({...profileForm, gstNumber: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">License No</label>
-                                    <input value={profileForm.licenseNumber} onChange={e => setProfileForm({...profileForm, licenseNumber: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">UPI ID (Settlements)</label>
-                                <input value={profileForm.upiId} onChange={e => setProfileForm({...profileForm, upiId: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                            </div>
+                            <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Mart Name" />
+                            <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none resize-none focus:ring-2 focus:ring-blue-500 transition-all" rows={2} placeholder="Address" />
+                            <input value={profileForm.upiId} onChange={e => setProfileForm({...profileForm, upiId: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="UPI ID" />
                             <div className="grid grid-cols-2 gap-2 pt-4">
-                                <button onClick={handleUpdateProfile} className="bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Save Hub Profile</button>
-                                <button onClick={() => setIsEditingProfile(false)} className="bg-slate-100 text-slate-400 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Discard Changes</button>
+                                <button onClick={handleUpdateProfile} className="bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Save Hub</button>
+                                <button onClick={() => setIsEditingProfile(false)} className="bg-slate-100 text-slate-400 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
                             </div>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex justify-between items-center group transition-all hover:bg-white hover:shadow-md">
+                            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex justify-between items-center">
                                 <div>
                                     <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1">Hub Name</p>
                                     <p className="font-black text-slate-900 text-base">{myStore?.name}</p>
                                 </div>
-                                <span className="text-3xl filter drop-shadow-md group-hover:scale-110 transition-transform">🏪</span>
+                                <span className="text-3xl">🏪</span>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 hover:bg-white transition-all hover:shadow-md">
-                                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1">GST Identification</p>
-                                    <p className="font-bold text-slate-800 text-[11px] truncate uppercase">{myStore?.gstNumber || 'Unregistered'}</p>
-                                </div>
-                                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 hover:bg-white transition-all hover:shadow-md">
-                                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1">Business License</p>
-                                    <p className="font-bold text-slate-800 text-[11px] truncate uppercase">{(user as any).licenseNumber || myStore?.id.slice(-8).toUpperCase()}</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white transition-all hover:shadow-md">
+                            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
                                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-2 pl-1">Settlement Endpoint (UPI)</p>
-                                 <div className="flex items-center gap-3">
-                                    <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black ${myStore?.upiId ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>{myStore?.upiId ? 'VERIFIED' : 'PENDING SETUP'}</span>
-                                    <p className="font-bold text-slate-800 text-sm tracking-tight">{myStore?.upiId || 'Not Configured'}</p>
-                                 </div>
+                                 <p className="font-bold text-slate-800 text-sm tracking-tight">{myStore?.upiId || 'Not Configured'}</p>
                             </div>
-
-                            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 hover:bg-white transition-all hover:shadow-md">
+                            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
                                 <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1 pl-1">Dispatch Node Address</p>
                                 <p className="font-bold text-slate-600 text-xs leading-relaxed">{myStore?.address}</p>
                             </div>
                         </div>
                     )}
-
-                    {!isEditingProfile && (
-                        <button onClick={onLogout} className="w-full py-5 bg-red-50 text-red-500 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest border border-red-100 active:bg-red-500 active:text-white transition-all shadow-sm mt-4">Terminate Operational Node</button>
-                    )}
-                </div>
-            </div>
-        )}
-
-        {showEmojiPicker && (
-            <div className="fixed inset-0 z-[3000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-8" onClick={() => setShowEmojiPicker(false)}>
-                <div className="bg-white p-8 rounded-[3rem] max-w-xs grid grid-cols-5 gap-3 shadow-2xl" onClick={e => e.stopPropagation()}>
-                    {EMOJI_GRID.map(e => <button key={e} onClick={() => { setNewItem({...newItem, emoji: e}); setShowEmojiPicker(false); }} className="text-3xl hover:scale-125 transition-transform">{e}</button>)}
+                    <button onClick={onLogout} className="w-full py-5 bg-red-50 text-red-500 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest border border-red-100 mt-4">Terminate Session</button>
                 </div>
             </div>
         )}
@@ -695,16 +466,16 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
             <div className="h-full flex flex-col animate-fade-in max-w-lg mx-auto relative">
                 <div className="px-6 mb-8">
                     <h2 className="text-3xl font-black text-slate-900 tracking-tight">Hub Calibration</h2>
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Calibrate your store GPS for precise hyper-local discovery</p>
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Calibrate store GPS for hyper-local discovery</p>
                 </div>
-                <div className="flex-1 relative rounded-[3.5rem] overflow-hidden border-4 border-white shadow-2xl group mx-2">
+                <div className="flex-1 relative rounded-[3.5rem] overflow-hidden border-4 border-white shadow-2xl mx-2">
                     <MapVisualizer stores={[]} userLat={myStore?.lat || 12.9716} userLng={myStore?.lng || 77.5946} selectedStore={null} onSelectStore={() => {}} mode="PICKUP" isSelectionMode={true} forcedCenter={{ lat: myStore?.lat || 12.9716, lng: myStore?.lng || 77.5946 }} />
                     <button 
                         onClick={handleDetectLive}
-                        className="absolute bottom-10 right-10 z-[500] bg-slate-900 text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-3 active:scale-95 transition-all animate-bounce-soft border-2 border-white/10 group-hover:scale-105"
+                        className="absolute bottom-10 right-10 z-[500] bg-slate-900 text-white px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-3 active:scale-95 transition-all"
                     >
                         <span className="text-2xl">⚡</span>
-                        <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Recalibrate Store GPS</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Recalibrate GPS</span>
                     </button>
                 </div>
             </div>
@@ -713,10 +484,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-slate-100 px-6 py-6 flex justify-between z-40 max-w-lg mx-auto rounded-t-[4rem] shadow-float">
            {[
-             { id: 'DASHBOARD', icon: '📊', label: 'Dashboard' }, 
+             { id: 'DASHBOARD', icon: '📊', label: 'Terminal' }, 
              { id: 'ORDERS', icon: '📦', label: 'Queue' }, 
              { id: 'INVENTORY', icon: '💎', label: 'Inventory' },
-             { id: 'TRANSACTIONS', icon: '💸', label: 'Financials' }
+             { id: 'TRANSACTIONS', icon: '💸', label: 'Ledger' }
            ].map(item => (
              <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex flex-col items-center gap-2 transition-all ${activeTab === item.id ? 'text-blue-600 scale-110' : 'text-slate-300'}`}>
                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl transition-all ${activeTab === item.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-transparent text-slate-400'}`}>{item.icon}</div>
