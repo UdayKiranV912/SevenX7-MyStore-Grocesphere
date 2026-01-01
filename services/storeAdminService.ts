@@ -90,7 +90,45 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
   if (storeId === 'demo-store-id') {
       const saved = localStorage.getItem(DEMO_ORDERS_KEY);
       if (saved) return JSON.parse(saved);
-      return [];
+      
+      const mockOrders: Order[] = [
+        {
+          id: 'demo-ord-live-1',
+          date: new Date().toISOString(),
+          items: [
+            { ...INITIAL_PRODUCTS[0], quantity: 2, selectedBrand: 'Generic', originalProductId: '1', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }
+          ],
+          total: 120,
+          status: 'packing',
+          paymentStatus: 'PAID',
+          paymentMethod: 'ONLINE',
+          mode: 'DELIVERY',
+          deliveryType: 'INSTANT',
+          storeName: 'Grocesphere Demo Mart',
+          customerName: 'Rahul Khanna',
+          userLocation: { lat: 12.9780, lng: 77.6450 },
+          storeLocation: { lat: 12.9716, lng: 77.6410 }
+        },
+        {
+            id: 'demo-ord-live-2',
+            date: new Date(Date.now() - 3600000).toISOString(),
+            items: [
+              { ...INITIAL_PRODUCTS[5], quantity: 1, selectedBrand: 'Generic', originalProductId: '6', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }
+            ],
+            total: 45,
+            status: 'placed',
+            paymentStatus: 'PAID',
+            paymentMethod: 'ONLINE',
+            mode: 'DELIVERY',
+            deliveryType: 'INSTANT',
+            storeName: 'Grocesphere Demo Mart',
+            customerName: 'Sonia Sharma',
+            userLocation: { lat: 12.9650, lng: 77.6350 },
+            storeLocation: { lat: 12.9716, lng: 77.6410 }
+        }
+      ];
+      localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(mockOrders));
+      return mockOrders;
   }
 
   const { data: orders } = await supabase
@@ -113,6 +151,7 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
     customerName: row.profiles?.full_name || 'Customer',
     customerPhone: row.profiles?.phone_number || '',
     userLocation: { lat: row.delivery_lat, lng: row.delivery_lng },
+    storeLocation: row.stores ? { lat: row.stores.lat, lng: row.stores.lng } : undefined,
     driverLocation: row.driver_lat && row.driver_lng ? { lat: row.driver_lat, lng: row.driver_lng } : undefined
   }));
 };
@@ -140,11 +179,18 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
 };
 
 export const updateStoreOrderStatus = async (orderId: string, status: Order['status']) => {
-    if (orderId.startsWith('demo-')) return;
+    if (orderId.startsWith('demo-')) {
+        const saved = localStorage.getItem(DEMO_ORDERS_KEY);
+        if (saved) {
+            const orders = JSON.parse(saved);
+            const updated = orders.map((o: any) => o.id === orderId ? { ...o, status } : o);
+            localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(updated));
+        }
+        return;
+    }
     await supabase.from('orders').update({ status }).eq('id', orderId);
 };
 
-// Comment: Fixed updateInventoryItem signature to accept all 8 arguments passed from components/store/StoreApp.tsx
 export const updateInventoryItem = async (
   storeId: string, 
   productId: string, 
@@ -171,7 +217,6 @@ export const updateInventoryItem = async (
 export const createCustomProduct = async (storeId: string, product: InventoryItem) => {
     if (storeId === 'demo-store-id') return;
     
-    // 1. Ensure product exists in global table
     await supabase.from('products').upsert({ 
         id: product.id, 
         name: product.name, 
@@ -180,7 +225,6 @@ export const createCustomProduct = async (storeId: string, product: InventoryIte
         mrp: product.mrp || product.price 
     });
 
-    // 2. Link to store inventory
     await supabase.from('inventory').insert({
         store_id: storeId,
         product_id: product.id,

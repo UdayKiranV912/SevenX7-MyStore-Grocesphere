@@ -14,6 +14,10 @@ const EMOJI_GRID = [
     '🍬', '🥘', '🥣', '🍇', '🍉', '🍍', '🥭', '🧅', '🧄', '🥜'
 ];
 
+const isValidCoord = (num: any): num is number => {
+  return typeof num === 'number' && !isNaN(num) && isFinite(num);
+};
+
 export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'ORDERS' | 'INVENTORY' | 'TRANSACTIONS' | 'LOCATION' | 'PROFILE'>('DASHBOARD');
   const [myStore, setMyStore] = useState<Store | null>(null);
@@ -24,7 +28,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [orderFilter, setOrderFilter] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
-  const [simulatedRiderPos, setSimulatedRiderPos] = useState<{lat: number, lng: number} | null>(null);
+  const [tick, setTick] = useState(0);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -52,6 +56,12 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     isNewCategory: false,
     newCategoryName: ''
   });
+
+  // Animation ticker for demo simulation
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const categories = useMemo(() => {
     const cats = new Set(inventory.filter(i => i.isActive).map(i => i.category));
@@ -133,9 +143,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     doc.setFontSize(10);
     doc.text("Operational BI Performance Dashboard", margin, 28);
     
-    const deliveredOrders = orders.filter(o => o.status === 'delivered');
-    const aov = deliveredOrders.length > 0 ? (analytics.totalRevenue / deliveredOrders.length).toFixed(0) : "0";
-
     autoTable(doc, {
         startY: 172,
         head: [['DATE', 'REFERENCE', 'CUSTOMER', 'AMOUNT', 'METHOD', 'STATUS']],
@@ -151,6 +158,44 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     if (user.id?.includes('demo')) {
         getIncomingOrders(myStore!.id).then(setOrders);
     }
+  };
+
+  const getSimulatedRiderPosForMerchant = (order: Order) => {
+      // 1. FOR REAL USERS: USE REAL TIME DATA
+      if (user.id && !user.id.includes('demo')) {
+          return order.driverLocation;
+      }
+
+      // 2. FOR DEMO MODE: Simulation of rider arriving to store
+      if (!myStore || !order.storeLocation) return undefined;
+      
+      const isLive = order.status === 'packing' || order.status === 'on_way';
+      if (!isLive) return undefined;
+
+      const loopDuration = 60; 
+      const offset = order.id.length * 3; 
+      const t = (tick + offset) % loopDuration;
+      const progress = t / loopDuration;
+
+      // Rider arriving for pickup (Packing status)
+      if (order.status === 'packing') {
+          const riderStartLat = myStore.lat + 0.008;
+          const riderStartLng = myStore.lng + 0.008;
+          return {
+              lat: riderStartLat + (myStore.lat - riderStartLat) * progress,
+              lng: riderStartLng + (myStore.lng - riderStartLng) * progress
+          };
+      }
+
+      // Rider heading to customer (On Way status)
+      if (order.status === 'on_way' && order.userLocation) {
+          return {
+              lat: myStore.lat + (order.userLocation.lat - myStore.lat) * progress,
+              lng: myStore.lng + (order.userLocation.lng - myStore.lng) * progress
+          };
+      }
+
+      return undefined;
   };
 
   const handleAddProduct = async () => {
@@ -192,22 +237,13 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
         name: profileForm.name,
         address: profileForm.address,
         type: profileForm.type,
-        gstNumber: profileForm.gstNumber,
         upiId: profileForm.upiId,
-        bankDetails: {
-          bankName: profileForm.bankName,
-          accountNumber: profileForm.accNo,
-          ifscCode: profileForm.ifsc,
-          accountHolder: user.name || ''
-        }
+        lat: myStore.lat,
+        lng: myStore.lng
       });
       setIsEditingProfile(false);
       getMyStore(user.id!).then(setMyStore);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   const handleDetectLive = async () => {
@@ -281,52 +317,83 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
 
         {activeTab === 'ORDERS' && (
             <div className="max-w-lg mx-auto space-y-6 animate-fade-in">
-                <div className="flex justify-between items-center px-2">
-                    <h2 className="text-2xl font-black tracking-tight text-slate-900">Order Center</h2>
-                    <div className="flex bg-slate-100 p-1 rounded-xl">
-                        <button onClick={() => setOrderFilter('ACTIVE')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${orderFilter === 'ACTIVE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Active Queue</button>
-                        <button onClick={() => setOrderFilter('HISTORY')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${orderFilter === 'HISTORY' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>History</button>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    {orders.filter(o => orderFilter === 'ACTIVE' ? !['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status) : ['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status)).length === 0 ? (
-                        <div className="text-center py-20 opacity-20 font-black uppercase tracking-widest text-[10px]">No orders in this cluster</div>
-                    ) : orders.filter(o => orderFilter === 'ACTIVE' ? !['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status) : ['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status)).map(order => (
-                        <div key={order.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm space-y-4 hover:shadow-md transition-all">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h4 className="font-black text-slate-900">{order.customerName || 'Anonymous Hub User'}</h4>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Order ID #{order.id.slice(-6)} • Total: ₹{order.total}</p>
-                                </div>
-                                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${order.status === 'placed' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>{order.status}</span>
-                            </div>
-                            
-                            {orderFilter === 'ACTIVE' && (
-                                <div className="flex gap-2 pt-2">
-                                    {order.status === 'placed' && (
-                                        <>
-                                            <button onClick={() => handleUpdateStatus(order.id, 'packing')} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Accept Order</button>
-                                            <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-50 text-red-500 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95">Reject</button>
-                                        </>
-                                    )}
-                                    {order.status === 'packing' && (
-                                        <>
-                                            <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'on_way' : 'ready')} className="flex-1 bg-slate-900 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Mark Ready</button>
-                                            <button onClick={() => setTrackingOrder(order)} className="px-4 bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">Track Rider</button>
-                                        </>
-                                    )}
-                                    {(order.status === 'on_way' || order.status === 'ready') && (
-                                        <>
-                                            <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'delivered' : 'picked_up')} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Finalize Order</button>
-                                            {order.mode === 'DELIVERY' && <button onClick={() => setTrackingOrder(order)} className="px-4 bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">Live Track</button>}
-                                        </>
-                                    )}
-                                </div>
-                            )}
+                {trackingOrder ? (
+                    <div className="space-y-4 animate-slide-up">
+                        <div className="flex items-center justify-between px-2">
+                            <button onClick={() => setTrackingOrder(null)} className="text-[10px] font-black uppercase text-slate-400 tracking-widest">← Back to Queue</button>
+                            <h2 className="text-sm font-black uppercase tracking-widest text-emerald-500">Live Rider Tracking</h2>
                         </div>
-                    ))}
-                </div>
+                        <div className="h-[50vh] rounded-[3.5rem] overflow-hidden border-4 border-white shadow-2xl relative">
+                            <MapVisualizer 
+                                stores={[]}
+                                userLat={myStore?.lat || 12.9716}
+                                userLng={myStore?.lng || 77.6410}
+                                selectedStore={myStore}
+                                onSelectStore={() => {}}
+                                mode="DELIVERY"
+                                showRoute={true}
+                                driverLocation={getSimulatedRiderPosForMerchant(trackingOrder)}
+                                forcedCenter={myStore}
+                            />
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[85%] bg-white/90 backdrop-blur-xl p-5 rounded-[2.5rem] shadow-2xl border border-white flex items-center gap-4 z-[1000]">
+                                <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-2xl shadow-lg animate-bounce">🛵</div>
+                                <div className="flex-1">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Fleet Assignment</p>
+                                    <p className="font-black text-slate-900 text-sm">{trackingOrder.status === 'packing' ? 'Rider heading to store' : 'Rider out for delivery'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-center px-2">
+                            <h2 className="text-2xl font-black tracking-tight text-slate-900">Order Center</h2>
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                <button onClick={() => setOrderFilter('ACTIVE')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${orderFilter === 'ACTIVE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Active Queue</button>
+                                <button onClick={() => setOrderFilter('HISTORY')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${orderFilter === 'HISTORY' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>History</button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            {orders.filter(o => orderFilter === 'ACTIVE' ? !['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status) : ['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status)).length === 0 ? (
+                                <div className="text-center py-20 opacity-20 font-black uppercase tracking-widest text-[10px]">No orders in this cluster</div>
+                            ) : orders.filter(o => orderFilter === 'ACTIVE' ? !['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status) : ['delivered', 'picked_up', 'rejected', 'cancelled'].includes(o.status)).map(order => (
+                                <div key={order.id} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm space-y-4 hover:shadow-md transition-all">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="font-black text-slate-900">{order.customerName || 'Anonymous Hub User'}</h4>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">Order ID #{order.id.slice(-6)} • Total: ₹{order.total}</p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${order.status === 'placed' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>{order.status}</span>
+                                    </div>
+                                    
+                                    {orderFilter === 'ACTIVE' && (
+                                        <div className="flex gap-2 pt-2">
+                                            {order.status === 'placed' && (
+                                                <>
+                                                    <button onClick={() => handleUpdateStatus(order.id, 'packing')} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Accept Order</button>
+                                                    <button onClick={() => handleUpdateStatus(order.id, 'rejected')} className="flex-1 bg-red-50 text-red-500 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95">Reject</button>
+                                                </>
+                                            )}
+                                            {order.status === 'packing' && (
+                                                <>
+                                                    <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'on_way' : 'ready')} className="flex-1 bg-slate-900 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Mark Ready</button>
+                                                    <button onClick={() => setTrackingOrder(order)} className="px-4 bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><span>🛵</span> <span>Track</span></button>
+                                                </>
+                                            )}
+                                            {(order.status === 'on_way' || order.status === 'ready') && (
+                                                <>
+                                                    <button onClick={() => handleUpdateStatus(order.id, order.mode === 'DELIVERY' ? 'delivered' : 'picked_up')} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg">Finalize Order</button>
+                                                    {order.mode === 'DELIVERY' && <button onClick={() => setTrackingOrder(order)} className="px-4 bg-blue-50 text-blue-600 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><span>🛵</span> <span>Track</span></button>}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
         )}
 
