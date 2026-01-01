@@ -30,40 +30,7 @@ export const Auth: React.FC<AuthProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [tempUserId, setTempUserId] = useState<string | null>(null);
 
-  // REAL-TIME APPROVAL LISTENER
-  useEffect(() => {
-    if (authMode === 'PENDING' && tempUserId) {
-        const channel = supabase
-            .channel(`public:profiles:id=eq.${tempUserId}`)
-            .on('postgres_changes', { 
-                event: 'UPDATE', 
-                schema: 'public', 
-                table: 'profiles',
-                filter: `id=eq.${tempUserId}`
-            }, (payload) => {
-                if (payload.new.verification_status === 'verified') {
-                    setAuthMode('UNLOCKED');
-                    setTimeout(() => {
-                        handleAutoLoginAfterApproval();
-                    }, 1500);
-                }
-            })
-            .subscribe();
-
-        return () => { channel.unsubscribe(); };
-    }
-  }, [authMode, tempUserId]);
-
-  const handleAutoLoginAfterApproval = async () => {
-      try {
-          const user = await loginUser(formData.email, formData.password);
-          onLoginSuccess(user);
-      } catch (e) {
-          console.error("Auto-login failed:", e);
-          setAuthMode('LOGIN');
-      }
-  };
-
+  // Register Handler: Sets up Supabase session then waits for approval
   const handleRegister = async (e: React.FormEvent) => {
       e.preventDefault();
       setErrorMsg('');
@@ -81,6 +48,7 @@ export const Auth: React.FC<AuthProps> = ({
           );
           setTempUserId(user.id || null);
           setLoading(false);
+          // After successful DB entry, move to the verification code step
           setAuthMode('VERIFY'); 
       } catch (err: any) {
           setErrorMsg(err.message || 'Registration failed');
@@ -88,6 +56,7 @@ export const Auth: React.FC<AuthProps> = ({
       }
   };
 
+  // Login Handler: Directs to either Dashboard or Pending screen based on status
   const handleStandardLogin = async (e: React.FormEvent) => {
       e.preventDefault();
       setErrorMsg('');
@@ -96,9 +65,10 @@ export const Auth: React.FC<AuthProps> = ({
           const user = await loginUser(formData.email, formData.password);
           onLoginSuccess(user);
       } catch (err: any) {
-          if (err.message.includes('approval') || err.status === 'pending') {
+          if (err.message?.includes('pending') || err.status === 'pending') {
+              // Extract data even if pending to start live listener
               setTempUserId(err.userId || null); 
-              setAuthMode('PENDING');
+              onLoginSuccess(err.userData);
           } else {
               setErrorMsg(err.message || 'Invalid Credentials');
           }
@@ -106,11 +76,19 @@ export const Auth: React.FC<AuthProps> = ({
       }
   };
 
-  const submitVerification = () => {
+  const submitVerificationCode = () => {
+      // 7777 is the designated simulation code for 'Terminal Unlock'
       if (verificationCode === '7777') { 
-          setAuthMode('PENDING');
+          // Re-auth or just move to success state
+          // In a real app, this would be an API call to verify a mobile OTP
+          loginUser(formData.email, formData.password)
+            .then(user => onLoginSuccess(user))
+            .catch(() => {
+                // If login fails (due to pending status), App.tsx will handle the pending screen
+                setAuthMode('PENDING');
+            });
       } else {
-          setErrorMsg('Invalid Super Admin Verification Code.');
+          setErrorMsg('Invalid Terminal Handshake Code.');
       }
   };
 
@@ -123,16 +101,6 @@ export const Auth: React.FC<AuthProps> = ({
         </div>
 
         <div className="w-full bg-white border border-slate-100 p-8 rounded-[3.5rem] shadow-soft-xl animate-slide-up relative overflow-hidden">
-            {authMode === 'UNLOCKED' && (
-                <div className="absolute inset-0 bg-emerald-500 z-[100] flex flex-col items-center justify-center text-white animate-fade-in">
-                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 animate-bounce shadow-2xl">
-                        <span className="text-4xl">🎉</span>
-                    </div>
-                    <h2 className="text-2xl font-black tracking-tight">Access Granted</h2>
-                    <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-70">Initializing Terminal...</p>
-                </div>
-            )}
-
             {(authMode === 'LOGIN' || authMode === 'REGISTER') && (
                 <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8 relative z-10">
                     <button onClick={() => setAuthMode('LOGIN')} className={`flex-1 py-3 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest ${authMode === 'LOGIN' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Sign In</button>
@@ -143,7 +111,7 @@ export const Auth: React.FC<AuthProps> = ({
             {loading ? (
                 <div className="flex flex-col items-center py-10 relative z-10">
                     <div className="w-10 h-10 border-4 border-slate-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
-                    <p className="font-bold text-slate-400 text-[10px] uppercase tracking-widest animate-pulse">Connecting to Core...</p>
+                    <p className="font-bold text-slate-400 text-[10px] uppercase tracking-widest animate-pulse">Establishing Peer Link...</p>
                 </div>
             ) : (
                 <div className="space-y-6 relative z-10">
@@ -166,10 +134,10 @@ export const Auth: React.FC<AuthProps> = ({
                                 <input placeholder="Set Terminal Password" type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
                             </div>
 
-                            <div className="space-y-3 pt-4 border-t border-slate-100 animate-slide-up">
+                            <div className="space-y-3 pt-4 border-t border-slate-100">
                                 <p className="text-[8px] font-black text-emerald-500 uppercase tracking-[0.2em] pl-2">Mart Configuration</p>
                                 <input placeholder="Mart / Store Name" value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                                <input placeholder="Settlement UPI ID (for Payouts)" value={formData.upiId} onChange={e => setFormData({...formData, upiId: e.target.value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                <input placeholder="Settlement UPI ID" value={formData.upiId} onChange={e => setFormData({...formData, upiId: e.target.value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
                                 <textarea placeholder="Full Physical Address" value={formData.storeAddress} onChange={e => setFormData({...formData, storeAddress: e.target.value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none resize-none" rows={2} required />
                             </div>
 
@@ -180,9 +148,12 @@ export const Auth: React.FC<AuthProps> = ({
                     )}
 
                     {authMode === 'VERIFY' && (
-                        <div className="text-center space-y-6 py-4">
+                        <div className="text-center space-y-6 py-4 animate-fade-in">
                             <div className="w-16 h-16 bg-slate-900 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-xl mb-2">🔑</div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Security Handshake.<br/>Enter Verification Code.</p>
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-black text-slate-900">Security Code</h3>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Identity Handshake Required</p>
+                            </div>
                             <input 
                                 placeholder="0000" 
                                 value={verificationCode}
@@ -191,24 +162,7 @@ export const Auth: React.FC<AuthProps> = ({
                                 className="w-full text-center text-4xl font-black bg-slate-50 rounded-3xl p-6 shadow-inner border-none outline-none focus:ring-2 focus:ring-slate-900 transition-all" 
                             />
                             {errorMsg && <p className="text-[10px] text-red-500 font-black">{errorMsg}</p>}
-                            <button onClick={submitVerification} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-lg">Verify Merchant</button>
-                        </div>
-                    )}
-
-                    {authMode === 'PENDING' && (
-                        <div className="text-center space-y-8 py-6 animate-fade-in">
-                            <div className="relative w-24 h-24 mx-auto">
-                                <div className="absolute inset-0 bg-emerald-500/10 rounded-full animate-ping"></div>
-                                <div className="relative w-full h-full bg-emerald-50 rounded-full flex items-center justify-center text-4xl shadow-inner border border-emerald-100">⚖️</div>
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Audit in Progress</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] leading-relaxed">Your merchant profile is under review.<br/>The terminal will activate automatically<br/>upon Super Admin approval.</p>
-                            </div>
-                            <div className="bg-slate-50 p-4 rounded-2xl flex items-center gap-3 border border-slate-100">
-                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Awaiting Live Handshake...</span>
-                            </div>
+                            <button onClick={submitVerificationCode} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-lg active:scale-95">Verify Terminal</button>
                         </div>
                     )}
                 </div>
