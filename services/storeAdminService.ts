@@ -64,7 +64,7 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
 
 export const subscribeToStoreOrders = (storeId: string, onUpdate: () => void) => {
     return supabase
-        .channel(`store-orders-realtime-${storeId}`)
+        .channel(`store-orders-${storeId}`)
         .on('postgres_changes', { 
             event: '*', 
             schema: 'public', 
@@ -76,7 +76,7 @@ export const subscribeToStoreOrders = (storeId: string, onUpdate: () => void) =>
 
 export const subscribeToStoreInventory = (storeId: string, onUpdate: () => void) => {
     return supabase
-        .channel(`store-inventory-realtime-${storeId}`)
+        .channel(`store-inventory-${storeId}`)
         .on('postgres_changes', { 
             event: '*', 
             schema: 'public', 
@@ -90,28 +90,7 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
   if (storeId === 'demo-store-id') {
       const saved = localStorage.getItem(DEMO_ORDERS_KEY);
       if (saved) return JSON.parse(saved);
-      
-      const mockOrders: Order[] = [
-        {
-          id: 'demo-ord-live-1',
-          date: new Date().toISOString(),
-          items: [
-            { ...INITIAL_PRODUCTS[0], quantity: 2, selectedBrand: 'Generic', originalProductId: '1', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' },
-            { ...INITIAL_PRODUCTS[40], quantity: 1, selectedBrand: 'Generic', originalProductId: '41', storeId, storeName: 'Demo Mart', storeType: 'Local Mart' }
-          ],
-          total: 154,
-          status: 'packing',
-          paymentStatus: 'PAID',
-          paymentMethod: 'ONLINE',
-          mode: 'DELIVERY',
-          deliveryType: 'INSTANT',
-          storeName: 'Grocesphere Demo Mart',
-          customerName: 'Arjun Mehra',
-          userLocation: { lat: 12.9780, lng: 77.6450 }
-        }
-      ];
-      localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(mockOrders));
-      return mockOrders;
+      return [];
   }
 
   const { data: orders } = await supabase
@@ -142,16 +121,7 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
   if (storeId === 'demo-store-id') {
       const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
       if (saved) return JSON.parse(saved);
-
-      const demoInv = INITIAL_PRODUCTS.slice(0, 50).map(p => ({
-          ...p,
-          inStock: true,
-          stock: 50,
-          storePrice: p.price,
-          isActive: true
-      }));
-      localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(demoInv));
-      return demoInv;
+      return [];
   }
 
   const { data: dbInv } = await supabase
@@ -170,62 +140,58 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
 };
 
 export const updateStoreOrderStatus = async (orderId: string, status: Order['status']) => {
-    if (orderId.startsWith('demo-')) {
-        const saved = localStorage.getItem(DEMO_ORDERS_KEY);
-        if (saved) {
-            const orders = JSON.parse(saved);
-            const updated = orders.map((o: any) => o.id === orderId ? { ...o, status } : o);
-            localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(updated));
-        }
-        return;
-    }
+    if (orderId.startsWith('demo-')) return;
     await supabase.from('orders').update({ status }).eq('id', orderId);
 };
 
-export const updateInventoryItem = async (storeId: string, productId: string, price: number, inStock: boolean, stock: number, brandDetails?: Record<string, BrandInventoryInfo>, mrp?: number, costPrice?: number) => {
-  if (storeId === 'demo-store-id') {
-    const inv = await getStoreInventory(storeId);
-    const updated = inv.map(i => i.id === productId ? { ...i, storePrice: price, inStock, stock } : i);
-    localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(updated));
-    return;
-  };
+// Comment: Fixed updateInventoryItem signature to accept all 8 arguments passed from components/store/StoreApp.tsx
+export const updateInventoryItem = async (
+  storeId: string, 
+  productId: string, 
+  price: number, 
+  inStock: boolean, 
+  stock: number,
+  brandData?: any,
+  mrp?: number,
+  costPrice?: number
+) => {
+  if (storeId === 'demo-store-id') return;
   await supabase.from('inventory').upsert({ 
     store_id: storeId, 
     product_id: productId, 
     price, 
     in_stock: inStock, 
-    stock, 
-    brand_data: brandDetails 
+    stock,
+    brand_data: brandData,
+    mrp: mrp,
+    cost_price: costPrice
   }, { onConflict: 'store_id, product_id' });
 };
 
-export const updateStoreProfile = async (storeId: string, updates: Partial<Store>) => {
-    if (storeId === 'demo-store-id') {
-        const saved = localStorage.getItem(DEMO_STORE_KEY);
-        if (saved) {
-            const store = JSON.parse(saved);
-            const updated = { ...store, ...updates };
-            localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(updated));
-        }
-        return;
-    }
-    const dbPayload: any = {};
-    if (updates.name) dbPayload.name = updates.name;
-    if (updates.address) dbPayload.address = updates.address;
-    if (updates.type) dbPayload.type = updates.type;
-    if (updates.gstNumber) dbPayload.gst_number = updates.gstNumber;
-    if (updates.upiId) dbPayload.upi_id = updates.upiId;
-    if (updates.bankDetails) dbPayload.bank_details = updates.bankDetails;
-    if (updates.lat) dbPayload.lat = updates.lat;
-    if (updates.lng) dbPayload.lng = updates.lng;
+export const createCustomProduct = async (storeId: string, product: InventoryItem) => {
+    if (storeId === 'demo-store-id') return;
     
-    await supabase.from('stores').update(dbPayload).eq('id', storeId);
+    // 1. Ensure product exists in global table
+    await supabase.from('products').upsert({ 
+        id: product.id, 
+        name: product.name, 
+        category: product.category, 
+        emoji: product.emoji, 
+        mrp: product.mrp || product.price 
+    });
+
+    // 2. Link to store inventory
+    await supabase.from('inventory').insert({
+        store_id: storeId,
+        product_id: product.id,
+        price: product.storePrice,
+        stock: product.stock,
+        in_stock: product.inStock
+    });
 };
 
 export const getSettlements = async (storeId: string): Promise<Settlement[]> => {
-    if (storeId === 'demo-store-id') return [
-        { id: 'STL-DEMO-1', orderId: 'demo-ord-hist-1', amount: 200, fromUpi: 'admin@grocesphere', transactionId: 'TXNDEMO123', date: new Date().toISOString(), status: 'COMPLETED' }
-    ];
+    if (storeId === 'demo-store-id') return [];
     const { data } = await supabase
         .from('payment_splits')
         .select('*')
@@ -236,25 +202,22 @@ export const getSettlements = async (storeId: string): Promise<Settlement[]> => 
         id: `STL-${row.id}`,
         orderId: row.order_id,
         amount: parseFloat(row.store_amount),
-        fromUpi: row.admin_upi || 'grocesphere.admin@upi',
-        transactionId: row.transaction_id,
+        fromUpi: row.admin_upi || 'admin@upi',
+        transactionId: row.transaction_id || 'LOCAL-TXN',
         date: row.created_at,
         status: row.is_settled ? 'COMPLETED' : 'PENDING'
     }));
 };
 
-export const createCustomProduct = async (storeId: string, product: InventoryItem) => {
-    if (storeId === 'demo-store-id') {
-        const inv = await getStoreInventory(storeId);
-        localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify([product, ...inv]));
-        return;
-    }
-    await supabase.from('products').upsert({ 
-        id: product.id, 
-        name: product.name, 
-        category: product.category, 
-        emoji: product.emoji, 
-        mrp: product.mrp || product.price 
-    });
-    await updateInventoryItem(storeId, product.id, product.storePrice, product.inStock, product.stock, product.brandDetails, product.mrp, product.costPrice);
+export const updateStoreProfile = async (storeId: string, updates: Partial<Store>) => {
+    if (storeId === 'demo-store-id') return;
+    const dbPayload: any = {};
+    if (updates.name) dbPayload.name = updates.name;
+    if (updates.address) dbPayload.address = updates.address;
+    if (updates.type) dbPayload.type = updates.type;
+    if (updates.upiId) dbPayload.upi_id = updates.upiId;
+    if (updates.lat) dbPayload.lat = updates.lat;
+    if (updates.lng) dbPayload.lng = updates.lng;
+    
+    await supabase.from('stores').update(dbPayload).eq('id', storeId);
 };

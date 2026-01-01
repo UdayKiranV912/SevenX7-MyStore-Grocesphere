@@ -17,17 +17,16 @@ const App: React.FC = () => {
      1️⃣ INITIAL SESSION LOAD
   ============================================================ */
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
         setLoading(false);
         return;
       }
 
-      // Fetch profile to check verification status
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', data.user.id)
+        .eq('id', session.user.id)
         .single();
 
       if (profile) {
@@ -37,24 +36,23 @@ const App: React.FC = () => {
             phone: profile.phone_number,
             isAuthenticated: true,
             isDemo: false,
-            location: null
+            location: null,
+            role: profile.role
           });
       }
-
       setLoading(false);
     });
   }, []);
 
   /* ============================================================
      2️⃣ REAL-TIME VERIFICATION HANDSHAKE
-     Listens for the 'verified' signal from the Super Admin
+     Instantly unlocks the terminal when an admin approves
   ============================================================ */
   useEffect(() => {
     if (!user?.id || user.isDemo) return;
 
-    // Establishing a private channel for this user's profile
     const channel = supabase
-      .channel(`profile-handshake-${user.id}`)
+      .channel(`profile-sync-${user.id}`)
       .on(
         'postgres_changes',
         { 
@@ -64,10 +62,6 @@ const App: React.FC = () => {
           filter: `id=eq.${user.id}` 
         },
         payload => {
-          // Trigger immediate UI refresh on status change
-          if (payload.new.verification_status === 'verified') {
-              console.log("Handshake successful: Terminal Unlocked");
-          }
           setUser(prev => {
             if (!prev) return null;
             return { 
@@ -88,7 +82,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     if (!user?.isDemo) {
-      await (supabase.auth as any).signOut();
+      await supabase.auth.signOut();
     }
     setUser(null);
   };
@@ -104,7 +98,7 @@ const App: React.FC = () => {
   const handleDemoStoreLogin = () => {
     setUser({
       id: `demo-store_owner`,
-      name: `Demo Merchant Terminal`,
+      name: `Demo Merchant`,
       phone: '9999999999',
       role: 'store_owner',
       verification_status: 'verified',
@@ -116,14 +110,13 @@ const App: React.FC = () => {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Initializing Terminal...</p>
+        <div className="flex flex-col items-center gap-6">
+            <div className="w-14 h-14 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Establishing Session...</p>
         </div>
     </div>
   );
 
-  // AUTHENTICATION GATE
   if (!user?.isAuthenticated) {
     return (
       <Auth
@@ -134,23 +127,20 @@ const App: React.FC = () => {
   }
 
   /* ============================================================
-     3️⃣ VERIFICATION GATE (LIVE PENDING STATE)
-     This screen blocks access until the DB status is updated
+     3️⃣ MANUAL APPROVAL GATE
   ============================================================ */
   if (!user.isDemo && user.verification_status !== 'verified') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-        <div className="w-full max-w-sm bg-white p-10 rounded-[4rem] shadow-soft-xl border border-slate-100 flex flex-col items-center gap-8 relative overflow-hidden">
-            {/* Progress Bar Animation */}
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100">
-                <div className="h-full bg-emerald-500 w-1/4 animate-[loading-slide_2s_infinite_linear]"></div>
+        <div className="w-full max-w-sm bg-white p-12 rounded-[4.5rem] shadow-soft-xl border border-slate-100 flex flex-col items-center gap-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-50">
+                <div className="h-full bg-emerald-500 w-1/4 animate-[audit-slide_2s_infinite_linear]"></div>
             </div>
             
             <style>{`
-                @keyframes loading-slide {
-                    0% { transform: translateX(-100%); width: 20%; }
-                    50% { width: 50%; }
-                    100% { transform: translateX(500%); width: 20%; }
+                @keyframes audit-slide {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(400%); }
                 }
             `}</style>
 
@@ -158,29 +148,28 @@ const App: React.FC = () => {
                 <span className="animate-bounce">⚖️</span>
             </div>
             
-            <div className="space-y-3">
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Audit in Progress</h2>
-                <p className="text-slate-400 text-sm font-medium leading-relaxed px-2">Your merchant identity is being verified by the Super Admin. This terminal will activate instantly upon approval.</p>
+            <div className="space-y-4">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Terminal Audit <br/> In Progress</h2>
+                <p className="text-slate-400 text-sm font-medium leading-relaxed">Your business identity is being verified. The terminal will automatically unlock once approved by the Super Admin.</p>
             </div>
 
             <div className="w-full bg-slate-50 p-5 rounded-[2rem] flex flex-col items-center gap-2 border border-slate-100">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Handshake Established</span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Handshake Active</span>
                 </div>
-                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Waiting for Signal...</p>
             </div>
 
-            <button onClick={handleLogout} className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-900 transition-colors pt-2">Exit Portal</button>
+            <button onClick={handleLogout} className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-red-500 transition-colors">Abort & Logout</button>
         </div>
       </div>
     );
   }
 
   /* ============================================================
-     4️⃣ ROLE-BASED HUB ROUTING
+     4️⃣ ROLE-BASED DASHBOARD ROUTING
   ============================================================ */
-  if (user.role === 'super_admin') {
+  if (user.role === 'super_admin' || user.role === 'admin') {
     return <SuperAdminApp user={user} onLogout={handleLogout} />;
   }
 
@@ -192,7 +181,6 @@ const App: React.FC = () => {
     return <DeliveryApp user={user} onLogout={handleLogout} />;
   }
 
-  // Merchant Terminal (Real & Demo)
   return <StoreApp user={user} onLogout={handleLogout} />;
 };
 
