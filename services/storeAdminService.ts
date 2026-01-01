@@ -6,6 +6,7 @@ import { INITIAL_PRODUCTS } from '../constants';
 const DEMO_STORE_KEY = 'grocesphere_demo_store';
 const DEMO_INVENTORY_KEY = 'grocesphere_demo_inventory';
 const DEMO_ORDERS_KEY = 'grocesphere_orders';
+const DEMO_SETTLEMENTS_KEY = 'grocesphere_settlements';
 
 export const getMyStore = async (ownerId: string): Promise<Store | null> => {
   if (ownerId === 'demo-user' || ownerId.includes('demo')) {
@@ -160,7 +161,17 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
   if (storeId === 'demo-store-id') {
       const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
       if (saved) return JSON.parse(saved);
-      return [];
+      
+      // Initial mock data for Demo Store
+      const mockInventory: InventoryItem[] = INITIAL_PRODUCTS.slice(0, 15).map(p => ({
+          ...p,
+          inStock: true,
+          stock: Math.floor(Math.random() * 50) + 10,
+          storePrice: p.price,
+          isActive: true
+      }));
+      localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(mockInventory));
+      return mockInventory;
   }
 
   const { data: dbInv } = await supabase
@@ -201,7 +212,20 @@ export const updateInventoryItem = async (
   mrp?: number,
   costPrice?: number
 ) => {
-  if (storeId === 'demo-store-id') return;
+  if (storeId === 'demo-store-id') {
+      const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
+      if (saved) {
+          const inventory: InventoryItem[] = JSON.parse(saved);
+          const updated = inventory.map(item => {
+              if (item.id === productId) {
+                  return { ...item, storePrice: price, inStock, stock, mrp: mrp || item.mrp, costPrice: costPrice || item.costPrice };
+              }
+              return item;
+          });
+          localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(updated));
+      }
+      return;
+  }
   await supabase.from('inventory').upsert({ 
     store_id: storeId, 
     product_id: productId, 
@@ -215,7 +239,13 @@ export const updateInventoryItem = async (
 };
 
 export const createCustomProduct = async (storeId: string, product: InventoryItem) => {
-    if (storeId === 'demo-store-id') return;
+    if (storeId === 'demo-store-id') {
+        const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
+        const inventory: InventoryItem[] = saved ? JSON.parse(saved) : [];
+        inventory.push(product);
+        localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(inventory));
+        return;
+    }
     
     await supabase.from('products').upsert({ 
         id: product.id, 
@@ -235,26 +265,70 @@ export const createCustomProduct = async (storeId: string, product: InventoryIte
 };
 
 export const getSettlements = async (storeId: string): Promise<Settlement[]> => {
-    if (storeId === 'demo-store-id') return [];
-    const { data } = await supabase
-        .from('payment_splits')
-        .select('*')
-        .eq('store_id', storeId)
-        .order('created_at', { ascending: false });
+  if (storeId === 'demo-store-id') {
+      const saved = localStorage.getItem(DEMO_SETTLEMENTS_KEY);
+      if (saved) return JSON.parse(saved);
 
-    return (data || []).map((row: any) => ({
-        id: `STL-${row.id}`,
-        orderId: row.order_id,
-        amount: parseFloat(row.store_amount),
-        fromUpi: row.admin_upi || 'admin@upi',
-        transactionId: row.transaction_id || 'LOCAL-TXN',
-        date: row.created_at,
-        status: row.is_settled ? 'COMPLETED' : 'PENDING'
-    }));
+      const mockSettlements: Settlement[] = [
+          {
+              id: 'STL-DEMO-001',
+              orderId: 'demo-ord-live-1',
+              amount: 114.00,
+              fromUpi: 'admin@okgroce',
+              transactionId: 'TXN_GSPHERE_8892',
+              date: new Date(Date.now() - 86400000).toISOString(),
+              status: 'COMPLETED'
+          },
+          {
+              id: 'STL-DEMO-002',
+              orderId: 'demo-ord-live-2',
+              amount: 42.75,
+              fromUpi: 'admin@okgroce',
+              transactionId: 'TXN_GSPHERE_9104',
+              date: new Date(Date.now() - 172800000).toISOString(),
+              status: 'COMPLETED'
+          },
+          {
+              id: 'STL-DEMO-003',
+              orderId: 'prev-ord-123',
+              amount: 540.20,
+              fromUpi: 'admin@okgroce',
+              transactionId: 'TXN_GSPHERE_7621',
+              date: new Date(Date.now() - 259200000).toISOString(),
+              status: 'COMPLETED'
+          }
+      ];
+      localStorage.setItem(DEMO_SETTLEMENTS_KEY, JSON.stringify(mockSettlements));
+      return mockSettlements;
+  }
+
+  const { data } = await supabase
+      .from('payment_splits')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false });
+
+  return (data || []).map((row: any) => ({
+      id: `STL-${row.id}`,
+      orderId: row.order_id,
+      amount: parseFloat(row.store_amount),
+      fromUpi: row.admin_upi || 'admin@upi',
+      transactionId: row.transaction_id || 'LOCAL-TXN',
+      date: row.created_at,
+      status: row.is_settled ? 'COMPLETED' : 'PENDING'
+  }));
 };
 
 export const updateStoreProfile = async (storeId: string, updates: Partial<Store>) => {
-    if (storeId === 'demo-store-id') return;
+    if (storeId === 'demo-store-id') {
+        const saved = localStorage.getItem(DEMO_STORE_KEY);
+        if (saved) {
+            const store = JSON.parse(saved);
+            const updated = { ...store, ...updates };
+            localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(updated));
+        }
+        return;
+    }
     const dbPayload: any = {};
     if (updates.name) dbPayload.name = updates.name;
     if (updates.address) dbPayload.address = updates.address;

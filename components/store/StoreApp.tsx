@@ -126,31 +126,172 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
         const val = validOrders.filter(o => new Date(o.date).toDateString() === d.toDateString()).reduce((sum, o) => sum + o.total, 0);
         return { label: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(), value: val };
     });
-    return { totalRevenue, chart, maxVal: Math.max(...chart.map(c => c.value), 100) };
+    return { 
+      totalRevenue, 
+      totalOrders: validOrders.length,
+      avgOrderValue: validOrders.length > 0 ? (totalRevenue / validOrders.length) : 0,
+      chart, 
+      maxVal: Math.max(...chart.map(c => c.value), 100) 
+    };
   }, [orders]);
+
+  const generateCSVReport = () => {
+    const headers = ['Date', 'Reference ID', 'Amount (INR)', 'Transaction ID', 'Status'];
+    const rows = settlements.map(s => [
+        new Date(s.date).toLocaleDateString(),
+        s.orderId,
+        s.amount.toFixed(2),
+        s.transactionId,
+        s.status
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Revenue_Report_${myStore?.name || 'Mart'}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const generatePDFReport = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
+    const margin = 20;
 
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    // Header Background
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(0, 0, pageWidth, 45, 'F');
+
+    // Title
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text(myStore?.name?.toUpperCase() || "MART TERMINAL", margin, 20);
-    doc.setFontSize(10);
-    doc.text("Operational BI Performance Dashboard", margin, 28);
+    doc.setFontSize(24);
+    doc.text(myStore?.name?.toUpperCase() || "STORE TERMINAL", margin, 20);
     
-    autoTable(doc, {
-        startY: 172,
-        head: [['DATE', 'REFERENCE', 'CUSTOMER', 'AMOUNT', 'METHOD', 'STATUS']],
-        body: orders.map(o => [new Date(o.date).toLocaleDateString(), `ORD-${o.id.slice(-6).toUpperCase()}`, o.customerName || 'Walk-in', `Rs. ${o.total.toFixed(2)}`, o.paymentMethod, o.status.toUpperCase()]),
-        theme: 'striped',
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184); // Slate 400
+    doc.text(`BUSINESS PERFORMANCE REPORT | ${new Date().toLocaleDateString()}`, margin, 28);
+    doc.text(`STORE ID: ${myStore?.id || 'N/A'}`, margin, 34);
+
+    // KPI Section Title
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("EXECUTIVE SUMMARY", margin, 58);
+
+    // KPI Tiles
+    const tileWidth = (pageWidth - (margin * 2) - 10) / 3;
+    const tileY = 65;
+    const tileHeight = 30;
+
+    const drawKPI = (x: number, label: string, value: string, color: [number, number, number]) => {
+        doc.setDrawColor(226, 232, 240); // Slate 200
+        doc.setFillColor(248, 250, 252); // Slate 50
+        doc.roundedRect(x, tileY, tileWidth, tileHeight, 4, 4, 'FD');
+        
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139); // Slate 500
+        doc.text(label.toUpperCase(), x + 5, tileY + 8);
+        
+        doc.setFontSize(14);
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.text(value, x + 5, tileY + 22);
+    };
+
+    drawKPI(margin, "Total Revenue", `Rs. ${analytics.totalRevenue.toLocaleString()}`, [16, 185, 129]); // Emerald
+    drawKPI(margin + tileWidth + 5, "Total Orders", `${analytics.totalOrders}`, [59, 130, 246]); // Blue
+    drawKPI(margin + (tileWidth + 5) * 2, "Avg Order Value", `Rs. ${analytics.avgOrderValue.toFixed(0)}`, [245, 158, 11]); // Amber
+
+    // Sales Trend Visualization (Power BI Style Chart)
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("SALES VELOCITY (7 DAY TREND)", margin, 110);
+
+    const chartX = margin;
+    const chartY = 118;
+    const chartW = pageWidth - (margin * 2);
+    const chartH = 40;
+    const barSpacing = 5;
+    const barWidth = (chartW - (barSpacing * 6)) / 7;
+
+    doc.setDrawColor(241, 245, 249); // Slate 100
+    doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH); // Baseline
+
+    analytics.chart.forEach((d, i) => {
+        const barH = (d.value / (analytics.maxVal || 1)) * chartH;
+        const x = chartX + (i * (barWidth + barSpacing));
+        
+        // Bar
+        doc.setFillColor(59, 130, 246); // Blue 500
+        doc.rect(x, chartY + chartH - barH, barWidth, barH, 'F');
+        
+        // Label
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text(d.label, x + (barWidth / 2), chartY + chartH + 5, { align: 'center' });
+        
+        // Value on top
+        if (d.value > 0) {
+            doc.setTextColor(15, 23, 42);
+            doc.text(`Rs.${d.value}`, x + (barWidth / 2), chartY + chartH - barH - 2, { align: 'center' });
+        }
     });
 
-    doc.save(`${myStore?.name || 'Mart'}_Report_${Date.now()}.pdf`);
+    // Transaction Details Table
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("RECENT TRANSACTIONS", margin, 178);
+
+    autoTable(doc, {
+        startY: 185,
+        margin: { left: margin, right: margin },
+        head: [['DATE', 'ORDER ID', 'CUSTOMER', 'METHOD', 'STATUS', 'AMOUNT']],
+        body: orders.slice(0, 15).map(o => [
+            new Date(o.date).toLocaleDateString(), 
+            `#${o.id.slice(-6).toUpperCase()}`, 
+            o.customerName || 'Hub User', 
+            o.paymentMethod, 
+            o.status.toUpperCase(), 
+            `Rs. ${o.total.toFixed(2)}`
+        ]),
+        headStyles: {
+            fillColor: [15, 23, 42],
+            textColor: [255, 255, 255],
+            fontSize: 8,
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        bodyStyles: {
+            fontSize: 8,
+            halign: 'center'
+        },
+        columnStyles: {
+            5: { fontStyle: 'bold', halign: 'right' }
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252]
+        },
+        theme: 'grid'
+    });
+
+    // Footer
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(8);
+    doc.setTextColor(203, 213, 225); // Slate 300
+    doc.text("GROCESPHERE OPERATIONAL BI TERMINAL | CONFIDENTIAL", pageWidth / 2, 285, { align: 'center' });
+
+    doc.save(`${myStore?.name || 'Mart'}_BI_Report_${Date.now()}.pdf`);
   };
 
   const handleUpdateStatus = async (orderId: string, status: Order['status']) => {
@@ -306,7 +447,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                         <span className="text-2xl group-hover:scale-110 transition-transform">📄</span>
                         <span className="text-[9px] font-black uppercase text-blue-600">Sales Report PDF</span>
                     </button>
-                    <button onClick={() => {}} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-all group">
+                    <button onClick={generateCSVReport} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-all group">
                         <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
                         <span className="text-[9px] font-black uppercase text-emerald-600">Revenue CSV</span>
                     </button>
@@ -472,7 +613,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                                     <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Ref: #{stl.orderId.slice(-6)} • {new Date(stl.date).toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            <span className="block text-[8px] font-black text-emerald-500 uppercase">Settled ✓</span>
+                            <span className="block text-[8px] font-black text-emerald-500 uppercase">{stl.status === 'COMPLETED' ? 'Settled ✓' : 'Pending'}</span>
                         </div>
                     ))}
                 </div>
