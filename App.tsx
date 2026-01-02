@@ -5,9 +5,7 @@ import { UserState } from './types';
 
 import { Auth } from './components/OTPVerification';
 import { StoreApp } from './components/store/StoreApp';
-import { CustomerApp } from './components/customer/CustomerApp';
 import { SuperAdminApp } from './components/admin/SuperAdminApp';
-import { DeliveryApp } from './components/delivery/DeliveryApp';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserState | null>(null);
@@ -34,7 +32,7 @@ const App: React.FC = () => {
             isAuthenticated: true,
             isDemo: false,
             location: null,
-            role: profile.role,
+            role: profile.role === 'store' ? 'store_owner' : profile.role,
             verification_status: profile.approval_status === 'approved' ? 'verified' : (profile.approval_status as any)
           });
       }
@@ -108,7 +106,7 @@ const App: React.FC = () => {
 
   if (!user?.isAuthenticated) return <Auth onLoginSuccess={handleLoginSuccess} onDemoStore={handleDemoStoreLogin} />;
 
-  if (!user.isDemo && user.verification_status !== 'verified') {
+  if (!user.isDemo && user.verification_status !== 'verified' && user.role !== 'super_admin' && user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
         <div className="w-full max-w-sm bg-white p-12 rounded-[4.5rem] shadow-soft-xl border border-slate-100 flex flex-col items-center gap-8 relative overflow-hidden">
@@ -117,12 +115,12 @@ const App: React.FC = () => {
             <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-5xl shadow-inner border border-emerald-100"><span className="animate-bounce">⚖️</span></div>
             <div className="space-y-4">
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Terminal Audit <br/> In Progress</h2>
-                <p className="text-slate-400 text-sm font-medium leading-relaxed">Your business identity is being verified. The terminal will automatically unlock once approved by the Super Admin.</p>
+                <p className="text-slate-400 text-sm font-medium leading-relaxed">Your business identity is being verified by the network governance. The terminal will automatically unlock once approved by the Super Admin.</p>
             </div>
             <div className="w-full bg-slate-50 p-5 rounded-[2rem] flex flex-col items-center gap-2 border border-slate-100">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Peer Handshake Active</span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Real-time Handshake Active</span>
                 </div>
             </div>
             <button onClick={handleLogout} className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-red-500 transition-colors">Abort & Logout</button>
@@ -132,8 +130,6 @@ const App: React.FC = () => {
   }
 
   if (user.role === 'super_admin' || user.role === 'admin') return <SuperAdminApp user={user} onLogout={handleLogout} />;
-  if (user.role === 'customer') return <CustomerApp user={user} onLogout={handleLogout} />;
-  if (user.role === 'delivery_partner') return <DeliveryApp user={user} onLogout={handleLogout} />;
   return <StoreApp user={user} onLogout={handleLogout} />;
 };
 

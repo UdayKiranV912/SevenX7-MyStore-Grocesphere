@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Store, Order, InventoryItem, Settlement } from '../types';
 import { INITIAL_PRODUCTS } from '../constants';
@@ -44,10 +45,10 @@ const initDemoData = () => {
     const mockOrders: Order[] = [
       {
         id: 'demo-ord-101',
-        date: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 mins ago
+        date: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
         items: [
-          { ...INITIAL_PRODUCTS[0], quantity: 2, selectedBrand: 'Generic', originalProductId: '1', storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'Local Mart' },
-          { ...INITIAL_PRODUCTS[41], quantity: 1, selectedBrand: 'Generic', originalProductId: '41', storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'Local Mart' }
+          { ...INITIAL_PRODUCTS[0], quantity: 2, selectedBrand: 'Generic', originalProductId: '1', storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'Local Mart' } as any,
+          { ...INITIAL_PRODUCTS[41], quantity: 1, selectedBrand: 'Generic', originalProductId: '41', storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'Local Mart' } as any
         ],
         total: 154,
         status: 'packing',
@@ -63,9 +64,9 @@ const initDemoData = () => {
       },
       {
         id: 'demo-ord-102',
-        date: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 mins ago
+        date: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
         items: [
-          { ...INITIAL_PRODUCTS[5], quantity: 5, selectedBrand: 'Generic', originalProductId: '6', storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'Local Mart' }
+          { ...INITIAL_PRODUCTS[5], quantity: 5, selectedBrand: 'Generic', originalProductId: '6', storeId: 'demo-store-id', storeName: 'Demo Mart', storeType: 'Local Mart' } as any
         ],
         total: 225,
         status: 'placed',
@@ -92,7 +93,6 @@ const initDemoData = () => {
   }
 };
 
-// Helper to map FE store types to BE store_type enum
 const mapStoreTypeToBackend = (type: string): any => {
     if (type === 'Vegetables/Fruits') return 'vegetables';
     if (type === 'Daily Needs / Milk Booth') return 'dairy';
@@ -101,7 +101,6 @@ const mapStoreTypeToBackend = (type: string): any => {
     return 'mini_mart';
 };
 
-// Helper to map BE store_type to FE
 const mapStoreTypeToFrontend = (type: string): any => {
     if (type === 'vegetables') return 'Vegetables/Fruits';
     if (type === 'dairy') return 'Daily Needs / Milk Booth';
@@ -147,41 +146,25 @@ export const getMyStore = async (ownerId: string): Promise<Store | null> => {
 };
 
 export const subscribeToStoreOrders = (storeId: string, onUpdate: () => void) => {
-    if (storeId === 'demo-store-id') {
-      // Return a dummy object for demo mode
-      return { unsubscribe: () => {} };
-    }
+    if (storeId === 'demo-store-id') return { unsubscribe: () => {} };
     return supabase
         .channel(`store-orders-${storeId}`)
-        .on('postgres_changes', { 
-            event: '*', 
-            schema: 'public', 
-            table: 'orders', 
-            filter: `store_id=eq.${storeId}` 
-        }, () => onUpdate())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, () => onUpdate())
         .subscribe();
 };
 
 export const subscribeToStoreInventory = (storeId: string, onUpdate: () => void) => {
-    if (storeId === 'demo-store-id') {
-      return { unsubscribe: () => {} };
-    }
+    if (storeId === 'demo-store-id') return { unsubscribe: () => {} };
     return supabase
         .channel(`store-inventory-${storeId}`)
-        .on('postgres_changes', { 
-            event: '*', 
-            schema: 'public', 
-            table: 'inventory', 
-            filter: `store_id=eq.${storeId}` 
-        }, () => onUpdate())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: `store_id=eq.${storeId}` }, () => onUpdate())
         .subscribe();
 };
 
 export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
   if (storeId === 'demo-store-id') {
       initDemoData();
-      const saved = localStorage.getItem(DEMO_ORDERS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return JSON.parse(localStorage.getItem(DEMO_ORDERS_KEY) || '[]');
   }
 
   const { data: orders } = await supabase
@@ -210,8 +193,7 @@ export const getIncomingOrders = async (storeId: string): Promise<Order[]> => {
 export const getStoreInventory = async (storeId: string): Promise<InventoryItem[]> => {
   if (storeId === 'demo-store-id') {
       initDemoData();
-      const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return JSON.parse(localStorage.getItem(DEMO_INVENTORY_KEY) || '[]');
   }
 
   const { data: dbInv } = await supabase
@@ -230,93 +212,59 @@ export const getStoreInventory = async (storeId: string): Promise<InventoryItem[
 
 export const updateStoreOrderStatus = async (orderId: string, status: Order['status']) => {
     if (orderId.startsWith('demo-')) {
-        const saved = localStorage.getItem(DEMO_ORDERS_KEY);
-        if (saved) {
-            const orders = JSON.parse(saved);
-            const updated = orders.map((o: any) => {
-                if (o.id === orderId) {
-                    // Add simulation for settlement on delivery
-                    if (status === 'delivered' || status === 'picked_up') {
-                        const settlements = JSON.parse(localStorage.getItem(DEMO_SETTLEMENTS_KEY) || '[]');
-                        settlements.unshift({
-                            id: `STL-${Date.now()}`,
-                            orderId: o.id,
-                            amount: o.total * 0.95, // 5% fee
-                            fromUpi: 'admin@okgroce',
-                            transactionId: `TXN_GSP_${Math.floor(Math.random()*900)+100}`,
-                            date: new Date().toISOString(),
-                            status: 'COMPLETED'
-                        });
-                        localStorage.setItem(DEMO_SETTLEMENTS_KEY, JSON.stringify(settlements));
-                    }
-                    return { ...o, status };
+        const orders = JSON.parse(localStorage.getItem(DEMO_ORDERS_KEY) || '[]');
+        const updated = orders.map((o: any) => {
+            if (o.id === orderId) {
+                if (status === 'delivered' || status === 'picked_up') {
+                    const settlements = JSON.parse(localStorage.getItem(DEMO_SETTLEMENTS_KEY) || '[]');
+                    settlements.unshift({
+                        id: `STL-${Date.now()}`,
+                        orderId: o.id,
+                        amount: o.total * 0.95,
+                        fromUpi: 'admin@okgroce',
+                        transactionId: `TXN_GSP_${Math.floor(Math.random()*900)+100}`,
+                        date: new Date().toISOString(),
+                        status: 'COMPLETED'
+                    });
+                    localStorage.setItem(DEMO_SETTLEMENTS_KEY, JSON.stringify(settlements));
                 }
-                return o;
-            });
-            localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(updated));
-        }
+                return { ...o, status };
+            }
+            return o;
+        });
+        localStorage.setItem(DEMO_ORDERS_KEY, JSON.stringify(updated));
         return;
     }
     
     let sqlStatus = status as string;
     if (status === 'packing') sqlStatus = 'packed';
-    
     await supabase.from('orders').update({ status: sqlStatus }).eq('id', orderId);
 };
 
 export const updateInventoryItem = async (storeId: string, productId: string, price: number, inStock: boolean, stock: number) => {
   if (storeId === 'demo-store-id') {
-    const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
-    if (saved) {
-        const inv = JSON.parse(saved);
-        const updated = inv.map((i: any) => i.id === productId ? { ...i, storePrice: price, inStock, stock, isActive: inStock } : i);
-        localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(updated));
-    }
+    const inv = JSON.parse(localStorage.getItem(DEMO_INVENTORY_KEY) || '[]');
+    const updated = inv.map((i: any) => i.id === productId ? { ...i, storePrice: price, inStock, stock, isActive: inStock } : i);
+    localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(updated));
     return;
   }
-  await supabase.from('inventory').upsert({ 
-    store_id: storeId, 
-    product_id: productId, 
-    price, 
-    active: inStock, 
-    stock 
-  }, { onConflict: 'store_id, product_id' });
+  await supabase.from('inventory').upsert({ store_id: storeId, product_id: productId, price, active: inStock, stock }, { onConflict: 'store_id, product_id' });
 };
 
 export const createCustomProduct = async (storeId: string, product: InventoryItem) => {
     if (storeId === 'demo-store-id') {
-      const saved = localStorage.getItem(DEMO_INVENTORY_KEY);
-      const inv = saved ? JSON.parse(saved) : [];
+      const inv = JSON.parse(localStorage.getItem(DEMO_INVENTORY_KEY) || '[]');
       inv.push({ ...product, isActive: true, inStock: true });
       localStorage.setItem(DEMO_INVENTORY_KEY, JSON.stringify(inv));
       return;
     }
-    const { data: pData } = await supabase.from('products').insert({
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        emoji: product.emoji
-    }).select().single();
-
-    if (pData) {
-        await supabase.from('inventory').insert({
-            store_id: storeId,
-            product_id: pData.id,
-            price: product.storePrice,
-            stock: product.stock,
-            active: true
-        });
-    }
+    const { data: pData } = await supabase.from('products').insert({ id: product.id, name: product.name, category: product.category, emoji: product.emoji }).select().single();
+    if (pData) await supabase.from('inventory').insert({ store_id: storeId, product_id: pData.id, price: product.storePrice, stock: product.stock, active: true });
 };
 
 export const getSettlements = async (storeId: string): Promise<Settlement[]> => {
-    if (storeId === 'demo-store-id') {
-        initDemoData();
-        const saved = localStorage.getItem(DEMO_SETTLEMENTS_KEY);
-        return saved ? JSON.parse(saved) : [];
-    }
-    
-    const { data } = await supabase.from('payments').select('*').eq('order_id', storeId);
+    if (storeId === 'demo-store-id') return JSON.parse(localStorage.getItem(DEMO_SETTLEMENTS_KEY) || '[]');
+    const { data } = await supabase.from('payments').select('*').eq('store_upi', (await getMyStore(storeId))?.upiId);
     return (data || []).map((row: any) => ({
         id: row.id,
         orderId: row.order_id,
@@ -330,11 +278,8 @@ export const getSettlements = async (storeId: string): Promise<Settlement[]> => 
 
 export const updateStoreProfile = async (storeId: string, updates: Partial<Store>) => {
     if (storeId === 'demo-store-id') {
-        const saved = localStorage.getItem(DEMO_STORE_KEY);
-        if (saved) {
-            const store = JSON.parse(saved);
-            localStorage.setItem(DEMO_STORE_KEY, JSON.stringify({ ...store, ...updates }));
-        }
+        const store = JSON.parse(localStorage.getItem(DEMO_STORE_KEY) || '{}');
+        localStorage.setItem(DEMO_STORE_KEY, JSON.stringify({ ...store, ...updates }));
         return;
     }
     const dbPayload: any = {};
@@ -344,6 +289,5 @@ export const updateStoreProfile = async (storeId: string, updates: Partial<Store
     if (updates.upiId) dbPayload.upi_id = updates.upiId;
     if (updates.lat) dbPayload.lat = updates.lat;
     if (updates.lng) dbPayload.lng = updates.lng;
-    
     await supabase.from('stores').update(dbPayload).eq('id', storeId);
 };
