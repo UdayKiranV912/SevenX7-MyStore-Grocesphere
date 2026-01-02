@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { Order } from '../types';
 
@@ -9,13 +8,13 @@ export const saveOrder = async (userId: string, order: Order) => {
       .insert({
         customer_id: userId,
         store_id: order.items[0].storeId, 
-        status: order.status || 'placed',
+        status: 'placed',
         total_amount: order.total,
-        mode: order.mode.toLowerCase(), // SQL Enum 'delivery','pickup'
+        mode: order.mode.toLowerCase(), 
         delivery_lat: order.userLocation?.lat,
         delivery_lng: order.userLocation?.lng,
-        transaction_ref: order.transactionId, // SQL uses transaction_ref
-        payment_status: order.paymentStatus.toLowerCase(), // SQL Enum 'pending','paid','failed'
+        transaction_ref: order.transactionId,
+        payment_status: 'paid',
         delivery_fee: order.splits?.deliveryFee || 0,
         service_fee: order.splits?.handlingFee || 0
       })
@@ -24,7 +23,6 @@ export const saveOrder = async (userId: string, order: Order) => {
 
     if (error) throw error;
 
-    // Items column doesn't exist in orders table based on SQL, so we use order_items table
     const orderItemsPayload = order.items.map(item => ({
         order_id: orderData.id,
         product_id: item.originalProductId,
@@ -32,24 +30,18 @@ export const saveOrder = async (userId: string, order: Order) => {
         price: item.price
     }));
 
-    await supabase
-        .from('order_items')
-        .insert(orderItemsPayload);
+    await supabase.from('order_items').insert(orderItemsPayload);
 
-    // SQL uses a 'payments' table, not 'payment_splits'
-    if (order.splits && order.paymentMethod === 'ONLINE') {
-        await supabase
-            .from('payments')
-            .insert({
-                order_id: orderData.id,
-                store_upi: order.splits.storeUpi,
-                admin_upi: 'grocesphere.admin@upi', 
-                delivery_upi: order.splits.driverUpi || null,
-                store_amount: order.splits.storeAmount,
-                admin_amount: order.splits.handlingFee || 0,
-                delivery_amount: order.splits.deliveryFee || 0,
-                settled: false
-            });
+    if (order.splits) {
+        await supabase.from('payments').insert({
+            order_id: orderData.id,
+            store_upi: order.splits.storeUpi,
+            admin_upi: 'grocesphere.admin@upi', 
+            store_amount: order.splits.storeAmount,
+            admin_amount: order.splits.handlingFee || 0,
+            delivery_amount: order.splits.deliveryFee || 0,
+            settled: false
+        });
     }
 
   } catch (err) {
@@ -71,17 +63,16 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
     return (data || []).map((row: any) => ({
         id: row.id,
         date: row.created_at,
-        items: [], // Would require another query to order_items or a join
+        items: [], // Requires follow-up query to order_items
         total: parseFloat(row.total_amount),
         status: row.status as any,
-        paymentStatus: row.payment_status?.toUpperCase() || 'PAID',
-        paymentMethod: 'ONLINE', // Default for this schema
+        paymentStatus: 'PAID',
+        paymentMethod: 'ONLINE',
         mode: row.mode?.toUpperCase() || 'DELIVERY',
         deliveryType: 'INSTANT',
         storeName: row.stores?.name || 'Community Mart',
         storeLocation: row.stores ? { lat: row.stores.lat, lng: row.stores.lng } : undefined,
         userLocation: { lat: row.delivery_lat, lng: row.delivery_lng },
-        driverLocation: undefined, // Requires query from live_locations
         transactionId: row.transaction_ref
     }));
   } catch (err) {

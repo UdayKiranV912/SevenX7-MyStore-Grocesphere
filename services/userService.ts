@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { UserState, SavedCard } from '../types';
 
@@ -6,6 +5,20 @@ const MOCK_CARDS: SavedCard[] = [
     { id: 'c1', type: 'VISA', last4: '4242', label: 'Personal Card' },
     { id: 'u1', type: 'UPI', upiId: 'user@okaxis', label: 'Primary UPI' }
 ];
+
+// Helper to map FE roles to BE enum
+const mapRoleToBackend = (role: string): any => {
+    if (role === 'store_owner') return 'store';
+    if (role === 'delivery_partner') return 'delivery';
+    return role;
+};
+
+// Helper to map BE roles to FE
+const mapRoleToFrontend = (role: string): any => {
+    if (role === 'store') return 'store_owner';
+    if (role === 'delivery') return 'delivery_partner';
+    return role;
+};
 
 export const registerUser = async (
     email: string, 
@@ -31,16 +44,17 @@ export const registerUser = async (
     if (authError) throw authError;
     if (!authData.user) throw new Error("Registration failed.");
 
+    const backendRole = mapRoleToBackend(role);
+
     const { error: profileError } = await supabase
         .from('profiles')
         .insert({
             id: authData.user.id,
             email: email,
             full_name: fullName,
-            phone: phone, // Changed from phone_number to phone to match SQL
-            role: role,
-            upi_id: upiId,
-            approval_status: 'pending' // Changed from verification_status to approval_status
+            phone: phone,
+            role: backendRole,
+            approval_status: 'pending'
         });
 
     if (profileError) throw profileError;
@@ -53,8 +67,8 @@ export const registerUser = async (
                 name: storeName,
                 address: storeAddress || 'Address Pending',
                 upi_id: upiId,
-                approved: false, // Changed from is_open to approved to match SQL
-                category: 'Local Mart', // Matches store type
+                store_type: 'mini_mart', // Default mapping
+                approved: false,
                 lat: 12.9716, 
                 lng: 77.5946
             });
@@ -103,29 +117,18 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         address: profileData.address || '',
         savedCards: MOCK_CARDS,
         location: null,
-        role: profileData.role as any,
+        role: mapRoleToFrontend(profileData.role),
         upiId: profileData.upi_id,
         verification_status: profileData.approval_status === 'approved' ? 'verified' : profileData.approval_status,
-        gstNumber: profileData.gst_number || '',
-        licenseNumber: profileData.license_number || ''
+        verificationStatus: profileData.approval_status === 'approved' ? 'verified' : profileData.approval_status
     };
 };
 
 export const updateUserProfile = async (id: string, updates: any) => {
-  const dbPayload: any = { ...updates };
-  if (updates.name) {
-      dbPayload.full_name = updates.name;
-      delete dbPayload.name;
-  }
-  if (updates.phone) {
-      dbPayload.phone = updates.phone; // Updated to match phone column
-      delete dbPayload.phone;
-  }
-  if (updates.upiId) {
-      dbPayload.upi_id = updates.upiId;
-      delete dbPayload.upiId;
-  }
-
+  const dbPayload: any = {};
+  if (updates.name) dbPayload.full_name = updates.name;
+  if (updates.phone) dbPayload.phone = updates.phone;
+  
   const { data, error } = await supabase
     .from('profiles')
     .update(dbPayload)

@@ -95,7 +95,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  useEffect(() => { loadInitialData(); }, [user.id]);
+  useEffect(() => { loadInitialData(); }, [user.id, tick]); // Refresh data periodically for demo
 
   // LIVE REALTIME SUBSCRIPTIONS
   useEffect(() => {
@@ -289,11 +289,26 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
       if (!myStore || !order.storeLocation) return undefined;
       const isLive = order.status === 'packing' || order.status === 'on_way';
       if (!isLive) return undefined;
+      
       const loopDuration = 60; 
-      const t = (tick + order.id.length) % loopDuration;
+      const offset = order.id.length * 3;
+      const t = (tick + offset) % loopDuration;
       const progress = t / loopDuration;
-      if (order.status === 'packing') return { lat: myStore.lat + 0.008 * (1-progress), lng: myStore.lng + 0.008 * (1-progress) };
-      if (order.status === 'on_way' && order.userLocation) return { lat: myStore.lat + (order.userLocation.lat - myStore.lat) * progress, lng: myStore.lng + (order.userLocation.lng - myStore.lng) * progress };
+
+      if (order.status === 'packing') {
+          const riderStartLat = myStore.lat + 0.008;
+          const riderStartLng = myStore.lng + 0.008;
+          return {
+              lat: riderStartLat + (myStore.lat - riderStartLat) * progress,
+              lng: riderStartLng + (myStore.lng - riderStartLng) * progress
+          };
+      }
+      if (order.status === 'on_way' && order.userLocation) {
+          return {
+              lat: myStore.lat + (order.userLocation.lat - myStore.lat) * progress,
+              lng: myStore.lng + (order.userLocation.lng - myStore.lng) * progress
+          };
+      }
       return undefined;
   };
 
@@ -347,7 +362,6 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
       await updateStoreProfile(myStore.id, { lat: loc.lat, lng: loc.lng, address: addr || myStore.address });
       getMyStore(user.id!).then(setMyStore);
     } catch (e) {
-      // Comment: Cast window to any to access alert in environments where it might be missing from Window type
       (window as any).alert("Location detection failed.");
     } finally { setLoading(false); }
   };
