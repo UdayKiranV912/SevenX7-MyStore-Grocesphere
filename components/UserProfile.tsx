@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { UserState, Store, StoreType } from '../types';
 import { updateUserProfile } from '../services/userService';
@@ -109,7 +108,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
       
       setIsEditing(false);
     } catch (e) { 
-      alert('Update failed. Check connection.'); 
+      // Comment: Access alert through window
+      window.alert('Update failed. Check connection.'); 
     } finally {
       setLoading(false);
     }
@@ -146,20 +146,22 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
             <div className="space-y-6">
                 <div className="space-y-4">
                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest border-b pb-1">Basic Info</p>
-                   <input value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Mart Name" />
-                   <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as StoreType})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none">
+                   {/* Comment: Cast e.target to access value */}
+                   <input value={formData.storeName} onChange={e => setFormData({...formData, storeName: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Mart Name" />
+                   <select value={formData.type} onChange={e => setFormData({...formData, type: (e.target as HTMLSelectElement).value as StoreType})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none">
                         {STORE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 </div>
 
                 <div className="space-y-4">
                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest border-b pb-1">Financial Details (KYC)</p>
-                   <input value={formData.upiId} onChange={e => setFormData({...formData, upiId: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="UPI ID (e.g. owner@okaxis)" />
+                   {/* Comment: Cast e.target to access value */}
+                   <input value={formData.upiId} onChange={e => setFormData({...formData, upiId: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-1 focus:ring-emerald-500" placeholder="UPI ID (e.g. owner@okaxis)" />
                    <div className="grid grid-cols-2 gap-2">
-                       <input value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="Bank Name" />
-                       <input value={formData.ifsc} onChange={e => setFormData({...formData, ifsc: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="IFSC Code" />
+                       <input value={formData.bankName} onChange={e => setFormData({...formData, bankName: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="Bank Name" />
+                       <input value={formData.ifsc} onChange={e => setFormData({...formData, ifsc: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="IFSC Code" />
                    </div>
-                   <input value={formData.accNo} onChange={e => setFormData({...formData, accNo: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="Account Number" />
+                   <input value={formData.accNo} onChange={e => setFormData({...formData, accNo: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" placeholder="Account Number" />
                 </div>
                 
                 <div className="flex gap-4 pt-6">

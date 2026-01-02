@@ -21,7 +21,8 @@ const isValidCoord = (num: any) => typeof num === 'number' && !isNaN(num);
  */
 export const getBrowserLocation = (): Promise<{ lat: number; lng: number; accuracy: number }> => {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
+    // Comment: Cast navigator to any to avoid property existence checks on specific navigator interfaces
+    if (!(navigator as any).geolocation) {
       reject(new Error("Geolocation not supported by this browser."));
       return;
     }
@@ -32,8 +33,8 @@ export const getBrowserLocation = (): Promise<{ lat: number; lng: number; accura
       maximumAge: 0, // Force fresh reading
     };
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    (navigator as any).geolocation.getCurrentPosition(
+      (pos: GeolocationPosition) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         if (isValidCoord(lat) && isValidCoord(lng)) {
@@ -46,7 +47,7 @@ export const getBrowserLocation = (): Promise<{ lat: number; lng: number; accura
             reject(new Error("Invalid coordinates received."));
         }
       },
-      (err) => {
+      (err: GeolocationPositionError) => {
         let msg = "Location error.";
         switch(err.code) {
             case 1: msg = "Please enable location permissions."; break;
@@ -67,10 +68,11 @@ export const watchLocation = (
   onLocation: (loc: { lat: number; lng: number; accuracy: number }) => void,
   onError: (err: any) => void
 ): number => {
-  if (!navigator.geolocation) return -1;
+  // Comment: Cast navigator to any to avoid property existence checks
+  if (!(navigator as any).geolocation) return -1;
   
-  return navigator.geolocation.watchPosition(
-    (pos) => {
+  return (navigator as any).geolocation.watchPosition(
+    (pos: GeolocationPosition) => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       if (isValidCoord(lat) && isValidCoord(lng)) {
@@ -84,7 +86,7 @@ export const watchLocation = (
           }
       }
     },
-    (err) => {
+    (err: GeolocationPositionError) => {
       if (err.code !== 3) onError(err);
     },
     { 
@@ -96,8 +98,9 @@ export const watchLocation = (
 };
 
 export const clearWatch = (watchId: number) => {
-    if (navigator.geolocation && watchId !== -1) {
-        navigator.geolocation.clearWatch(watchId);
+    // Comment: Cast navigator to any to avoid property existence checks
+    if ((navigator as any).geolocation && watchId !== -1) {
+        (navigator as any).geolocation.clearWatch(watchId);
     }
 };
 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Store, OrderMode } from '../types';
 import { watchLocation, clearWatch, getBrowserLocation, getRoute } from '../services/locationService';
@@ -94,7 +93,8 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
       mapInstanceRef.current = map;
       setIsMapReady(true);
       
-      const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+      // Comment: Access ResizeObserver through window to fix missing type error
+      const resizeObserver = new (window as any).ResizeObserver(() => map.invalidateSize());
       resizeObserver.observe(mapContainerRef.current);
 
       return () => {
@@ -160,7 +160,8 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         mapInstanceRef.current.flyTo([loc.lat, loc.lng], 18);
       }
     } catch (e) {
-      alert("Could not detect location. Please check GPS settings.");
+      // Comment: Access alert through window
+      window.alert("Could not detect location. Please check GPS settings.");
     }
   };
 

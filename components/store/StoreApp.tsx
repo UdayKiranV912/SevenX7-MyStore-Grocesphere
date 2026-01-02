@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { UserState, Store, Order, InventoryItem, Settlement } from '../../types';
 import { getMyStore, getStoreInventory, getIncomingOrders, updateStoreOrderStatus, updateInventoryItem, createCustomProduct, getSettlements, updateStoreProfile, subscribeToStoreOrders, subscribeToStoreInventory } from '../../services/storeAdminService';
@@ -138,11 +137,11 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   const generateCSVReport = () => {
     const headers = ['Date', 'Reference ID', 'Amount (INR)', 'Transaction ID', 'Status'];
     const rows = settlements.map(s => [
-        new Date(s.date).toLocaleDateString(),
-        s.orderId,
-        s.amount.toFixed(2),
-        s.transactionId,
-        s.status
+        `"${new Date(s.date).toLocaleDateString()}"`,
+        `"${s.orderId}"`,
+        `"${s.amount.toFixed(2)}"`,
+        `"${s.transactionId}"`,
+        `"${s.status}"`
     ]);
 
     const csvContent = [
@@ -151,14 +150,16 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    // Comment: Access document via window as any
+    const link = (window as any).document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     link.setAttribute('download', `Revenue_Report_${myStore?.name || 'Mart'}_${Date.now()}.csv`);
     link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    (window as any).document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    (window as any).document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const generatePDFReport = () => {
@@ -401,7 +402,8 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
       getMyStore(user.id!).then(setMyStore);
     } catch (e) {
       console.error(e);
-      alert("Location detection failed.");
+      // Comment: Access alert through window
+      window.alert("Location detection failed.");
     } finally {
       setLoading(false);
     }
@@ -549,7 +551,8 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                         <div className="flex gap-4">
                             <div className="flex-1 space-y-2">
                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Product Title</label>
-                                <input placeholder="e.g. Sourdough" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" />
+                                {/* Comment: Cast e.target to access value */}
+                                <input placeholder="e.g. Sourdough" value={newItem.name} onChange={e => setNewItem({...newItem, name: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" />
                             </div>
                             <div className="w-20 space-y-2 text-center">
                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Icon</label>
@@ -557,9 +560,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Price</label><input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
-                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">MRP</label><input type="number" value={newItem.mrp} onChange={e => setNewItem({...newItem, mrp: e.target.value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
-                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Qty</label><input type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: e.target.value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
+                            {/* Comment: Cast e.target to access value */}
+                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Price</label><input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
+                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">MRP</label><input type="number" value={newItem.mrp} onChange={e => setNewItem({...newItem, mrp: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
+                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Qty</label><input type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
                         </div>
                         <button onClick={handleAddProduct} className="w-full bg-slate-900 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">Deploy to Terminal</button>
                     </div>
@@ -585,9 +589,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/5">
-                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">Store (₹)</label><input type="number" value={item.storePrice} onChange={e => updateInventoryQuick(item, { storePrice: parseFloat(e.target.value) })} className="w-full bg-slate-800 text-blue-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">MRP (₹)</label><input type="number" value={item.mrp || item.storePrice} onChange={e => updateInventoryQuick(item, { mrp: parseFloat(e.target.value) })} className="w-full bg-slate-800 text-slate-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">QTY</label><input type="number" value={item.stock} onChange={e => updateInventoryQuick(item, { stock: parseInt(e.target.value) })} className={`w-full p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500 ${item.stock < 10 ? 'bg-red-900/30 text-red-400' : 'bg-slate-800 text-white'}`} /></div>
+                                        {/* Comment: Cast e.target to access value */}
+                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">Store (₹)</label><input type="number" value={item.storePrice} onChange={e => updateInventoryQuick(item, { storePrice: parseFloat((e.target as HTMLInputElement).value) })} className="w-full bg-slate-800 text-blue-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
+                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">MRP (₹)</label><input type="number" value={item.mrp || item.storePrice} onChange={e => updateInventoryQuick(item, { mrp: parseFloat((e.target as HTMLInputElement).value) })} className="w-full bg-slate-800 text-slate-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
+                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">QTY</label><input type="number" value={item.stock} onChange={e => updateInventoryQuick(item, { stock: parseInt((e.target as HTMLInputElement).value) })} className={`w-full p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500 ${item.stock < 10 ? 'bg-red-900/30 text-red-400' : 'bg-slate-800 text-white'}`} /></div>
                                     </div>
                                 </div>
                             ))}
@@ -638,9 +643,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
 
                     {isEditingProfile ? (
                         <div className="space-y-5 px-1">
-                            <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Mart Name" />
-                            <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none resize-none focus:ring-2 focus:ring-blue-500 transition-all" rows={2} placeholder="Address" />
-                            <input value={profileForm.upiId} onChange={e => setProfileForm({...profileForm, upiId: e.target.value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="UPI ID" />
+                            {/* Comment: Cast e.target to access value */}
+                            <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Mart Name" />
+                            <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: (e.target as HTMLTextAreaElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none resize-none focus:ring-2 focus:ring-blue-500 transition-all" rows={2} placeholder="Address" />
+                            <input value={profileForm.upiId} onChange={e => setProfileForm({...profileForm, upiId: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="UPI ID" />
                             <div className="grid grid-cols-2 gap-2 pt-4">
                                 <button onClick={handleUpdateProfile} className="bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Save Hub</button>
                                 <button onClick={() => setIsEditingProfile(false)} className="bg-slate-100 text-slate-400 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>

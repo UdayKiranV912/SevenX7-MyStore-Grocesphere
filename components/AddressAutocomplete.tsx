@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { searchAddress } from '../services/locationService';
 
@@ -38,12 +37,14 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   // Handle outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      // Comment: Cast wrapperRef.current and event.target to any to fix missing property/type errors
+      if (wrapperRef.current && !(wrapperRef.current as any).contains(event.target as any)) {
         setShowSuggestions(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    // Comment: Access document through window
+    (window as any).document.addEventListener("mousedown", handleClickOutside);
+    return () => (window as any).document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSelect = (item: any) => {
@@ -56,7 +57,8 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     <div className={`relative ${className}`} ref={wrapperRef}>
       <textarea
         value={value}
-        onChange={(e) => { onChange(e.target.value); setShowSuggestions(true); }}
+        // Comment: Cast e.target to HTMLTextAreaElement to access value property
+        onChange={(e) => { onChange((e.target as HTMLTextAreaElement).value); setShowSuggestions(true); }}
         placeholder={placeholder}
         className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-sm font-bold text-slate-700 placeholder-slate-300 focus:ring-2 focus:ring-brand-DEFAULT focus:bg-white resize-none shadow-inner transition-all"
         rows={3}
