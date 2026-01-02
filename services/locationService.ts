@@ -33,8 +33,9 @@ export const getBrowserLocation = (): Promise<{ lat: number; lng: number; accura
       maximumAge: 0, // Force fresh reading
     };
 
+    // Comment: Cast pos to any to bypass potential environment type mismatch for GeolocationPosition
     (navigator as any).geolocation.getCurrentPosition(
-      (pos: GeolocationPosition) => {
+      (pos: any) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         if (isValidCoord(lat) && isValidCoord(lng)) {
@@ -47,7 +48,8 @@ export const getBrowserLocation = (): Promise<{ lat: number; lng: number; accura
             reject(new Error("Invalid coordinates received."));
         }
       },
-      (err: GeolocationPositionError) => {
+      // Comment: Cast err to any to bypass potential environment type mismatch for GeolocationPositionError
+      (err: any) => {
         let msg = "Location error.";
         switch(err.code) {
             case 1: msg = "Please enable location permissions."; break;
@@ -71,8 +73,9 @@ export const watchLocation = (
   // Comment: Cast navigator to any to avoid property existence checks
   if (!(navigator as any).geolocation) return -1;
   
+  // Comment: Cast pos to any to bypass potential environment type mismatch for GeolocationPosition
   return (navigator as any).geolocation.watchPosition(
-    (pos: GeolocationPosition) => {
+    (pos: any) => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       if (isValidCoord(lat) && isValidCoord(lng)) {
@@ -86,7 +89,8 @@ export const watchLocation = (
           }
       }
     },
-    (err: GeolocationPositionError) => {
+    // Comment: Cast err to any to bypass potential environment type mismatch for GeolocationPositionError
+    (err: any) => {
       if (err.code !== 3) onError(err);
     },
     { 

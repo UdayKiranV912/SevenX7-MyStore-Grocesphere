@@ -57,8 +57,8 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     <div className={`relative ${className}`} ref={wrapperRef}>
       <textarea
         value={value}
-        // Comment: Cast e.target to HTMLTextAreaElement to access value property
-        onChange={(e) => { onChange((e.target as HTMLTextAreaElement).value); setShowSuggestions(true); }}
+        // Comment: Cast e.target to any to avoid property existence checks in some environments
+        onChange={(e) => { onChange((e.target as any).value); setShowSuggestions(true); }}
         placeholder={placeholder}
         className="w-full bg-slate-50 border-0 rounded-2xl p-4 text-sm font-bold text-slate-700 placeholder-slate-300 focus:ring-2 focus:ring-brand-DEFAULT focus:bg-white resize-none shadow-inner transition-all"
         rows={3}

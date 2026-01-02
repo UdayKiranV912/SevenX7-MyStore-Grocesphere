@@ -135,27 +135,21 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   }, [orders]);
 
   const generateCSVReport = () => {
-    const headers = ['Date', 'Reference ID', 'Amount (INR)', 'Transaction ID', 'Status'];
+    const headers = ['Date', 'Order ID', 'Amount (INR)', 'Method', 'Status'];
     const rows = settlements.map(s => [
         `"${new Date(s.date).toLocaleDateString()}"`,
         `"${s.orderId}"`,
         `"${s.amount.toFixed(2)}"`,
-        `"${s.transactionId}"`,
+        `"${s.fromUpi}"`,
         `"${s.status}"`
     ]);
 
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-    ].join('\n');
-
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    // Comment: Access document via window as any
     const link = (window as any).document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `Revenue_Report_${myStore?.name || 'Mart'}_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
+    link.setAttribute('download', `BI_Revenue_Report_${myStore?.name || 'Mart'}_${Date.now()}.csv`);
     (window as any).document.body.appendChild(link);
     link.click();
     (window as any).document.body.removeChild(link);
@@ -167,52 +161,56 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
 
-    // Header Background
-    doc.setFillColor(15, 23, 42); // Slate 900
-    doc.rect(0, 0, pageWidth, 45, 'F');
+    // Power BI Theme Background
+    doc.setFillColor(15, 23, 42); // Dark Slate 900
+    doc.rect(0, 0, pageWidth, 50, 'F');
 
-    // Title
+    // Title Block
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(24);
-    doc.text(myStore?.name?.toUpperCase() || "STORE TERMINAL", margin, 20);
+    doc.setFontSize(22);
+    doc.text(myStore?.name?.toUpperCase() || "STORE TERMINAL", margin, 22);
     
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184); // Slate 400
-    doc.text(`BUSINESS PERFORMANCE REPORT | ${new Date().toLocaleDateString()}`, margin, 28);
-    doc.text(`STORE ID: ${myStore?.id || 'N/A'}`, margin, 34);
+    doc.text(`EXECUTIVE BI DASHBOARD | GENERATED: ${new Date().toLocaleString()}`, margin, 30);
+    doc.text(`NETWORK NODE ID: ${myStore?.id || 'LOCAL-D-01'}`, margin, 35);
 
     // KPI Section Title
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("EXECUTIVE SUMMARY", margin, 58);
+    doc.text("EXECUTIVE PERFORMANCE SUMMARY", margin, 62);
 
-    // KPI Tiles
+    // Drawing KPI Tiles
     const tileWidth = (pageWidth - (margin * 2) - 10) / 3;
-    const tileY = 65;
-    const tileHeight = 30;
+    const tileY = 68;
+    const tileHeight = 28;
 
-    const drawKPI = (x: number, label: string, value: string, color: [number, number, number]) => {
+    const drawKPITile = (x: number, label: string, value: string, sub: string, color: [number, number, number]) => {
         doc.setDrawColor(226, 232, 240); // Slate 200
         doc.setFillColor(248, 250, 252); // Slate 50
-        doc.roundedRect(x, tileY, tileWidth, tileHeight, 4, 4, 'FD');
+        doc.roundedRect(x, tileY, tileWidth, tileHeight, 3, 3, 'FD');
         
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setTextColor(100, 116, 139); // Slate 500
-        doc.text(label.toUpperCase(), x + 5, tileY + 8);
+        doc.text(label.toUpperCase(), x + 5, tileY + 7);
         
-        doc.setFontSize(14);
+        doc.setFontSize(13);
         doc.setTextColor(color[0], color[1], color[2]);
-        doc.text(value, x + 5, tileY + 22);
+        doc.text(value, x + 5, tileY + 18);
+
+        doc.setFontSize(6);
+        doc.setTextColor(148, 163, 184);
+        doc.text(sub, x + 5, tileY + 24);
     };
 
-    drawKPI(margin, "Total Revenue", `Rs. ${analytics.totalRevenue.toLocaleString()}`, [16, 185, 129]); // Emerald
-    drawKPI(margin + tileWidth + 5, "Total Orders", `${analytics.totalOrders}`, [59, 130, 246]); // Blue
-    drawKPI(margin + (tileWidth + 5) * 2, "Avg Order Value", `Rs. ${analytics.avgOrderValue.toFixed(0)}`, [245, 158, 11]); // Amber
+    drawKPITile(margin, "Total Revenue", `Rs. ${analytics.totalRevenue.toLocaleString()}`, "Across all nodes", [16, 185, 129]); // Emerald
+    drawKPITile(margin + tileWidth + 5, "Total Orders", `${analytics.totalOrders}`, "Verified fulfillments", [59, 130, 246]); // Blue
+    drawKPITile(margin + (tileWidth + 5) * 2, "Avg Order Val", `Rs. ${analytics.avgOrderValue.toFixed(0)}`, "Basket health", [245, 158, 11]); // Amber
 
-    // Sales Trend Visualization (Power BI Style Chart)
+    // Sales Velocity Chart
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
@@ -221,30 +219,29 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     const chartX = margin;
     const chartY = 118;
     const chartW = pageWidth - (margin * 2);
-    const chartH = 40;
-    const barSpacing = 5;
-    const barWidth = (chartW - (barSpacing * 6)) / 7;
+    const chartH = 45;
+    const barGap = 6;
+    const barW = (chartW - (barGap * 6)) / 7;
 
-    doc.setDrawColor(241, 245, 249); // Slate 100
-    doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH); // Baseline
+    // Baseline
+    doc.setDrawColor(226, 232, 240);
+    doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH);
 
     analytics.chart.forEach((d, i) => {
-        const barH = (d.value / (analytics.maxVal || 1)) * chartH;
-        const x = chartX + (i * (barWidth + barSpacing));
+        const h = (d.value / (analytics.maxVal || 1)) * chartH;
+        const bx = chartX + (i * (barW + barGap));
         
-        // Bar
         doc.setFillColor(59, 130, 246); // Blue 500
-        doc.rect(x, chartY + chartH - barH, barWidth, barH, 'F');
+        doc.rect(bx, chartY + chartH - h, barW, h, 'F');
         
-        // Label
         doc.setFontSize(7);
         doc.setTextColor(148, 163, 184);
-        doc.text(d.label, x + (barWidth / 2), chartY + chartH + 5, { align: 'center' });
+        doc.text(d.label, bx + (barW/2), chartY + chartH + 5, { align: 'center' });
         
-        // Value on top
         if (d.value > 0) {
             doc.setTextColor(15, 23, 42);
-            doc.text(`Rs.${d.value}`, x + (barWidth / 2), chartY + chartH - barH - 2, { align: 'center' });
+            doc.setFontSize(6);
+            doc.text(`Rs.${d.value}`, bx + (barW/2), chartY + chartH - h - 2, { align: 'center' });
         }
     });
 
@@ -252,47 +249,32 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("RECENT TRANSACTIONS", margin, 178);
+    doc.text("RECENT SETTLEMENT LEDGER", margin, 182);
 
     autoTable(doc, {
-        startY: 185,
+        startY: 188,
         margin: { left: margin, right: margin },
-        head: [['DATE', 'ORDER ID', 'CUSTOMER', 'METHOD', 'STATUS', 'AMOUNT']],
-        body: orders.slice(0, 15).map(o => [
-            new Date(o.date).toLocaleDateString(), 
-            `#${o.id.slice(-6).toUpperCase()}`, 
-            o.customerName || 'Hub User', 
-            o.paymentMethod, 
-            o.status.toUpperCase(), 
-            `Rs. ${o.total.toFixed(2)}`
+        head: [['DATE', 'REFERENCE ID', 'SENDER', 'AMOUNT (INR)', 'STATUS']],
+        body: settlements.slice(0, 15).map(s => [
+            new Date(s.date).toLocaleDateString(), 
+            s.orderId.toUpperCase(), 
+            s.fromUpi, 
+            `Rs. ${s.amount.toFixed(2)}`, 
+            s.status
         ]),
-        headStyles: {
-            fillColor: [15, 23, 42],
-            textColor: [255, 255, 255],
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'center'
-        },
-        bodyStyles: {
-            fontSize: 8,
-            halign: 'center'
-        },
-        columnStyles: {
-            5: { fontStyle: 'bold', halign: 'right' }
-        },
-        alternateRowStyles: {
-            fillColor: [248, 250, 252]
-        },
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7, textColor: [51, 65, 85] },
+        columnStyles: { 3: { fontStyle: 'bold', halign: 'right' } },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
         theme: 'grid'
     });
 
-    // Footer
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    // Footer Branding
     doc.setFontSize(8);
     doc.setTextColor(203, 213, 225); // Slate 300
-    doc.text("GROCESPHERE OPERATIONAL BI TERMINAL | CONFIDENTIAL", pageWidth / 2, 285, { align: 'center' });
+    doc.text("GROCESPHERE BI TERMINAL | SEVENX7 INNOVATIONS | CONFIDENTIAL DATA", pageWidth / 2, 288, { align: 'center' });
 
-    doc.save(`${myStore?.name || 'Mart'}_BI_Report_${Date.now()}.pdf`);
+    doc.save(`Grocesphere_BI_${myStore?.name || 'Mart'}_${Date.now()}.pdf`);
   };
 
   const handleUpdateStatus = async (orderId: string, status: Order['status']) => {
@@ -303,40 +285,15 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   };
 
   const getSimulatedRiderPosForMerchant = (order: Order) => {
-      // 1. FOR REAL USERS: USE REAL TIME DATA
-      if (user.id && !user.id.includes('demo')) {
-          return order.driverLocation;
-      }
-
-      // 2. FOR DEMO MODE: Simulation of rider arriving to store
+      if (user.id && !user.id.includes('demo')) return order.driverLocation;
       if (!myStore || !order.storeLocation) return undefined;
-      
       const isLive = order.status === 'packing' || order.status === 'on_way';
       if (!isLive) return undefined;
-
       const loopDuration = 60; 
-      const offset = order.id.length * 3; 
-      const t = (tick + offset) % loopDuration;
+      const t = (tick + order.id.length) % loopDuration;
       const progress = t / loopDuration;
-
-      // Rider arriving for pickup (Packing status)
-      if (order.status === 'packing') {
-          const riderStartLat = myStore.lat + 0.008;
-          const riderStartLng = myStore.lng + 0.008;
-          return {
-              lat: riderStartLat + (myStore.lat - riderStartLat) * progress,
-              lng: riderStartLng + (myStore.lng - riderStartLng) * progress
-          };
-      }
-
-      // Rider heading to customer (On Way status)
-      if (order.status === 'on_way' && order.userLocation) {
-          return {
-              lat: myStore.lat + (order.userLocation.lat - myStore.lat) * progress,
-              lng: myStore.lng + (order.userLocation.lng - myStore.lng) * progress
-          };
-      }
-
+      if (order.status === 'packing') return { lat: myStore.lat + 0.008 * (1-progress), lng: myStore.lng + 0.008 * (1-progress) };
+      if (order.status === 'on_way' && order.userLocation) return { lat: myStore.lat + (order.userLocation.lat - myStore.lat) * progress, lng: myStore.lng + (order.userLocation.lng - myStore.lng) * progress };
       return undefined;
   };
 
@@ -368,24 +325,17 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
   const updateInventoryQuick = async (item: InventoryItem, updates: Partial<InventoryItem>) => {
     const updated = { ...item, ...updates };
     setInventory(prev => prev.map(i => i.id === item.id ? updated : i));
-    await updateInventoryItem(myStore!.id, item.id, updated.storePrice, updated.stock > 0, updated.stock, item.brandDetails, updated.mrp, updated.costPrice);
+    await updateInventoryItem(myStore!.id, item.id, updated.storePrice, updated.stock > 0, updated.stock);
   };
 
   const handleUpdateProfile = async () => {
     if (!myStore) return;
     setLoading(true);
     try {
-      await updateStoreProfile(myStore.id, {
-        name: profileForm.name,
-        address: profileForm.address,
-        type: profileForm.type,
-        upiId: profileForm.upiId,
-        lat: myStore.lat,
-        lng: myStore.lng
-      });
+      await updateStoreProfile(myStore.id, { name: profileForm.name, address: profileForm.address, type: profileForm.type, upiId: profileForm.upiId });
       setIsEditingProfile(false);
       getMyStore(user.id!).then(setMyStore);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } finally { setLoading(false); }
   };
 
   const handleDetectLive = async () => {
@@ -394,19 +344,12 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
     try {
       const loc = await getBrowserLocation();
       const addr = await reverseGeocode(loc.lat, loc.lng);
-      await updateStoreProfile(myStore.id, {
-        lat: loc.lat,
-        lng: loc.lng,
-        address: addr || myStore.address
-      });
+      await updateStoreProfile(myStore.id, { lat: loc.lat, lng: loc.lng, address: addr || myStore.address });
       getMyStore(user.id!).then(setMyStore);
     } catch (e) {
-      console.error(e);
-      // Comment: Access alert through window
-      window.alert("Location detection failed.");
-    } finally {
-      setLoading(false);
-    }
+      // Comment: Cast window to any to access alert in environments where it might be missing from Window type
+      (window as any).alert("Location detection failed.");
+    } finally { setLoading(false); }
   };
 
   return (
@@ -447,7 +390,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                 <div className="grid grid-cols-2 gap-4">
                     <button onClick={generatePDFReport} className="bg-blue-50/50 border border-blue-100 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-all group">
                         <span className="text-2xl group-hover:scale-110 transition-transform">📄</span>
-                        <span className="text-[9px] font-black uppercase text-blue-600">Sales Report PDF</span>
+                        <span className="text-[9px] font-black uppercase text-blue-600">Performance PDF</span>
                     </button>
                     <button onClick={generateCSVReport} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 transition-all group">
                         <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
@@ -467,17 +410,7 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                             <h2 className="text-sm font-black uppercase tracking-widest text-emerald-500">Live Rider Tracking</h2>
                         </div>
                         <div className="h-[50vh] rounded-[3.5rem] overflow-hidden border-4 border-white shadow-2xl relative">
-                            <MapVisualizer 
-                                stores={[]}
-                                userLat={myStore?.lat || 12.9716}
-                                userLng={myStore?.lng || 77.6410}
-                                selectedStore={myStore}
-                                onSelectStore={() => {}}
-                                mode="DELIVERY"
-                                showRoute={true}
-                                driverLocation={getSimulatedRiderPosForMerchant(trackingOrder)}
-                                forcedCenter={myStore}
-                            />
+                            <MapVisualizer stores={[]} userLat={myStore?.lat || 12.9716} userLng={myStore?.lng || 77.6410} selectedStore={myStore} onSelectStore={() => {}} mode="DELIVERY" showRoute={true} driverLocation={getSimulatedRiderPosForMerchant(trackingOrder)} forcedCenter={myStore} />
                             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[85%] bg-white/90 backdrop-blur-xl p-5 rounded-[2.5rem] shadow-2xl border border-white flex items-center gap-4 z-[1000]">
                                 <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-2xl shadow-lg animate-bounce">🛵</div>
                                 <div className="flex-1">
@@ -551,8 +484,8 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                         <div className="flex gap-4">
                             <div className="flex-1 space-y-2">
                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Product Title</label>
-                                {/* Comment: Cast e.target to access value */}
-                                <input placeholder="e.g. Sourdough" value={newItem.name} onChange={e => setNewItem({...newItem, name: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" />
+                                {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                                <input placeholder="e.g. Sourdough" value={newItem.name} onChange={e => setNewItem({...newItem, name: (e.target as any).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold shadow-inner border-none outline-none" />
                             </div>
                             <div className="w-20 space-y-2 text-center">
                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Icon</label>
@@ -560,10 +493,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            {/* Comment: Cast e.target to access value */}
-                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Price</label><input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
-                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">MRP</label><input type="number" value={newItem.mrp} onChange={e => setNewItem({...newItem, mrp: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
-                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Qty</label><input type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
+                            {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Price</label><input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: (e.target as any).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
+                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">MRP</label><input type="number" value={newItem.mrp} onChange={e => setNewItem({...newItem, mrp: (e.target as any).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
+                            <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase text-center block">Qty</label><input type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: (e.target as any).value})} className="w-full bg-slate-50 p-3 rounded-xl text-center font-bold outline-none" /></div>
                         </div>
                         <button onClick={handleAddProduct} className="w-full bg-slate-900 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">Deploy to Terminal</button>
                     </div>
@@ -589,10 +522,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/5">
-                                        {/* Comment: Cast e.target to access value */}
-                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">Store (₹)</label><input type="number" value={item.storePrice} onChange={e => updateInventoryQuick(item, { storePrice: parseFloat((e.target as HTMLInputElement).value) })} className="w-full bg-slate-800 text-blue-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">MRP (₹)</label><input type="number" value={item.mrp || item.storePrice} onChange={e => updateInventoryQuick(item, { mrp: parseFloat((e.target as HTMLInputElement).value) })} className="w-full bg-slate-800 text-slate-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">QTY</label><input type="number" value={item.stock} onChange={e => updateInventoryQuick(item, { stock: parseInt((e.target as HTMLInputElement).value) })} className={`w-full p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500 ${item.stock < 10 ? 'bg-red-900/30 text-red-400' : 'bg-slate-800 text-white'}`} /></div>
+                                        {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">Store (₹)</label><input type="number" value={item.storePrice} onChange={e => updateInventoryQuick(item, { storePrice: parseFloat((e.target as any).value) })} className="w-full bg-slate-800 text-blue-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
+                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">MRP (₹)</label><input type="number" value={item.mrp || item.storePrice} onChange={e => updateInventoryQuick(item, { mrp: parseFloat((e.target as any).value) })} className="w-full bg-slate-800 text-slate-400 p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500" /></div>
+                                        <div className="space-y-1"><label className="text-[8px] font-black text-slate-500 uppercase text-center block">QTY</label><input type="number" value={item.stock} onChange={e => updateInventoryQuick(item, { stock: parseInt((e.target as any).value) })} className={`w-full p-3 rounded-xl text-center font-black text-xs border-none outline-none focus:ring-1 focus:ring-blue-500 ${item.stock < 10 ? 'bg-red-900/30 text-red-400' : 'bg-slate-800 text-white'}`} /></div>
                                     </div>
                                 </div>
                             ))}
@@ -643,10 +576,10 @@ export const StoreApp: React.FC<{user: UserState, onLogout: () => void}> = ({ us
 
                     {isEditingProfile ? (
                         <div className="space-y-5 px-1">
-                            {/* Comment: Cast e.target to access value */}
-                            <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Mart Name" />
-                            <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: (e.target as HTMLTextAreaElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none resize-none focus:ring-2 focus:ring-blue-500 transition-all" rows={2} placeholder="Address" />
-                            <input value={profileForm.upiId} onChange={e => setProfileForm({...profileForm, upiId: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="UPI ID" />
+                            {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                            <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: (e.target as any).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Mart Name" />
+                            <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: (e.target as any).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none resize-none focus:ring-2 focus:ring-blue-500 transition-all" rows={2} placeholder="Address" />
+                            <input value={profileForm.upiId} onChange={e => setProfileForm({...profileForm, upiId: (e.target as any).value})} className="w-full bg-slate-50 p-4 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="UPI ID" />
                             <div className="grid grid-cols-2 gap-2 pt-4">
                                 <button onClick={handleUpdateProfile} className="bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Save Hub</button>
                                 <button onClick={() => setIsEditingProfile(false)} className="bg-slate-100 text-slate-400 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>

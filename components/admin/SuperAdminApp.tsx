@@ -37,13 +37,13 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
             id: row.id,
             name: row.name,
             address: row.address,
-            verificationStatus: row.verification_status,
+            verificationStatus: row.approved ? 'verified' : 'pending',
             upiId: row.upi_id,
-            type: row.type,
+            type: row.category,
             lat: row.lat,
             lng: row.lng,
             rating: row.rating,
-            isOpen: row.is_open,
+            isOpen: row.approved,
             ownerId: row.owner_id,
             availableProductIds: []
         } as Store)));
@@ -54,8 +54,8 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleApprove = async (store: Store) => {
       setLoading(true);
       try {
-          await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', store.ownerId);
-          await supabase.from('stores').update({ verification_status: 'verified', is_open: true }).eq('id', store.id);
+          await supabase.from('profiles').update({ approval_status: 'approved' }).eq('id', store.ownerId);
+          await supabase.from('stores').update({ approved: true }).eq('id', store.id);
           await loadStores();
       } catch (e) {
           console.error(e);
@@ -67,8 +67,8 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleReject = async (store: Store) => {
       setLoading(true);
       try {
-          await supabase.from('profiles').update({ verification_status: 'rejected' }).eq('id', store.ownerId);
-          await supabase.from('stores').update({ verification_status: 'rejected', is_open: false }).eq('id', store.id);
+          await supabase.from('profiles').update({ approval_status: 'rejected' }).eq('id', store.ownerId);
+          await supabase.from('stores').update({ approved: false }).eq('id', store.id);
           await loadStores();
       } catch (e) {
           console.error(e);
@@ -111,8 +111,6 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
 
                       {loading ? (
                           <div className="py-20 text-center animate-pulse text-[10px] font-black uppercase tracking-widest text-slate-500">Querying Merchant Layer...</div>
-                      ) : stores.length === 0 ? (
-                          <div className="py-40 text-center opacity-30 font-black uppercase tracking-[0.3em] text-xs">Zero Pending Records</div>
                       ) : (
                           <div className="grid grid-cols-1 gap-4">
                               {stores.map(store => (
@@ -127,9 +125,6 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
                                               <div className="flex flex-wrap gap-4 mt-5">
                                                   <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-black/40 px-3 py-1.5 rounded-lg">UPI: <span className="text-emerald-400 font-mono ml-1">{store.upiId || 'Not Linked'}</span></div>
                                                   <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-black/40 px-3 py-1.5 rounded-lg">Status: <span className={store.verificationStatus === 'verified' ? 'text-emerald-400' : 'text-orange-400'}>{store.verificationStatus?.toUpperCase()}</span></div>
-                                                  {store.verificationStatus === 'pending' && (
-                                                      <div className="text-[9px] font-black text-slate-100 uppercase tracking-[0.2em] bg-blue-600 px-3 py-1.5 rounded-lg animate-pulse shadow-lg shadow-blue-600/20">Handshake: 7777</div>
-                                                  )}
                                               </div>
                                           </div>
                                       </div>

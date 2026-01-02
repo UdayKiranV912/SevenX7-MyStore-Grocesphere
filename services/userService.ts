@@ -37,10 +37,10 @@ export const registerUser = async (
             id: authData.user.id,
             email: email,
             full_name: fullName,
-            phone_number: phone,
+            phone: phone, // Changed from phone_number to phone to match SQL
             role: role,
             upi_id: upiId,
-            verification_status: 'pending'
+            approval_status: 'pending' // Changed from verification_status to approval_status
         });
 
     if (profileError) throw profileError;
@@ -53,10 +53,8 @@ export const registerUser = async (
                 name: storeName,
                 address: storeAddress || 'Address Pending',
                 upi_id: upiId,
-                is_open: false,
-                verification_status: 'pending',
-                type: 'Local Mart',
-                rating: 5.0,
+                approved: false, // Changed from is_open to approved to match SQL
+                category: 'Local Mart', // Matches store type
                 lat: 12.9716, 
                 lng: 77.5946
             });
@@ -96,11 +94,10 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         throw new Error("Profile not found.");
     }
 
-    // We return the user even if pending so the App can listen for real-time verification status changes
     return {
         isAuthenticated: true,
         id: profileData.id,
-        phone: profileData.phone_number || '',
+        phone: profileData.phone || '',
         email: profileData.email || '',
         name: profileData.full_name || '',
         address: profileData.address || '',
@@ -108,7 +105,7 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         location: null,
         role: profileData.role as any,
         upiId: profileData.upi_id,
-        verification_status: profileData.verification_status as any,
+        verification_status: profileData.approval_status === 'approved' ? 'verified' : profileData.approval_status,
         gstNumber: profileData.gst_number || '',
         licenseNumber: profileData.license_number || ''
     };
@@ -121,7 +118,7 @@ export const updateUserProfile = async (id: string, updates: any) => {
       delete dbPayload.name;
   }
   if (updates.phone) {
-      dbPayload.phone_number = updates.phone;
+      dbPayload.phone = updates.phone; // Updated to match phone column
       delete dbPayload.phone;
   }
   if (updates.upiId) {

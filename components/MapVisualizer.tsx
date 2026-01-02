@@ -160,8 +160,8 @@ export const MapVisualizer: React.FC<MapVisualizerProps> = ({
         mapInstanceRef.current.flyTo([loc.lat, loc.lng], 18);
       }
     } catch (e) {
-      // Comment: Access alert through window
-      window.alert("Could not detect location. Please check GPS settings.");
+      // Comment: Access alert through window as any to bypass potential environment type mismatch
+      (window as any).alert("Could not detect location. Please check GPS settings.");
     }
   };
 

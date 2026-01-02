@@ -69,7 +69,7 @@ export const Auth: React.FC<AuthProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm flex flex-col items-center">
+      <div className="w-full max-sm flex flex-col items-center">
         <div className="mb-10 animate-fade-in flex flex-col items-center text-center">
             <SevenX7Logo size="medium" />
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3">Partner Terminal Portal</p>
@@ -92,9 +92,9 @@ export const Auth: React.FC<AuthProps> = ({
                 <div className="space-y-6 relative z-10">
                     {authMode === 'LOGIN' && (
                         <form onSubmit={handleStandardLogin} className="space-y-4">
-                            {/* Comment: Cast e.target to access value */}
-                            <input type="email" placeholder="Business Email" value={formData.email} onChange={e => setFormData({...formData, email: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                            <input type="password" placeholder="Terminal Password" value={formData.password} onChange={e => setFormData({...formData, password: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                            {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                            <input type="email" placeholder="Business Email" value={formData.email} onChange={e => setFormData({...formData, email: (e.target as any).value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                            <input type="password" placeholder="Terminal Password" value={formData.password} onChange={e => setFormData({...formData, password: (e.target as any).value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
                             {errorMsg && <p className="text-[10px] text-red-500 font-black text-center">{errorMsg}</p>}
                             <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-transform">Enter Terminal</button>
                         </form>
@@ -104,19 +104,19 @@ export const Auth: React.FC<AuthProps> = ({
                         <form onSubmit={handleRegister} className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 hide-scrollbar">
                             <div className="space-y-3">
                                 <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] pl-2">Merchant Identity</p>
-                                {/* Comment: Cast e.target to access value */}
-                                <input placeholder="Owner Full Name" value={formData.fullName} onChange={e => setFormData({...formData, fullName: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                                <input placeholder="Business Contact No" value={formData.phone} onChange={e => setFormData({...formData, phone: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                                <input placeholder="Merchant Email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                                <input placeholder="Set Terminal Password" type="password" value={formData.password} onChange={e => setFormData({...formData, password: (e.target as HTMLInputElement).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                                <input placeholder="Owner Full Name" value={formData.fullName} onChange={e => setFormData({...formData, fullName: (e.target as any).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                <input placeholder="Business Contact No" value={formData.phone} onChange={e => setFormData({...formData, phone: (e.target as any).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                <input placeholder="Merchant Email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: (e.target as any).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                <input placeholder="Set Terminal Password" type="password" value={formData.password} onChange={e => setFormData({...formData, password: (e.target as any).value})} className="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
                             </div>
 
                             <div className="space-y-3 pt-4 border-t border-slate-100">
                                 <p className="text-[8px] font-black text-emerald-500 uppercase tracking-[0.2em] pl-2">Mart Configuration</p>
-                                {/* Comment: Cast e.target to access value */}
-                                <input placeholder="Mart / Store Name" value={formData.storeName} onChange={e => setFormData({...formData, storeName: (e.target as HTMLInputElement).value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                                <input placeholder="Settlement UPI ID" value={formData.upiId} onChange={e => setFormData({...formData, upiId: (e.target as HTMLInputElement).value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
-                                <textarea placeholder="Full Physical Address" value={formData.storeAddress} onChange={e => setFormData({...formData, storeAddress: (e.target as HTMLTextAreaElement).value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none resize-none" rows={2} required />
+                                {/* Comment: Cast e.target to any to bypass potential environment type mismatch */}
+                                <input placeholder="Mart / Store Name" value={formData.storeName} onChange={e => setFormData({...formData, storeName: (e.target as any).value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                <input placeholder="Settlement UPI ID" value={formData.upiId} onChange={e => setFormData({...formData, upiId: (e.target as any).value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" required />
+                                <textarea placeholder="Full Physical Address" value={formData.storeAddress} onChange={e => setFormData({...formData, storeAddress: (e.target as any).value})} className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl p-4 text-sm font-bold shadow-inner outline-none resize-none" rows={2} required />
                             </div>
 
                             {errorMsg && <p className="text-[10px] text-red-500 font-black text-center">{errorMsg}</p>}

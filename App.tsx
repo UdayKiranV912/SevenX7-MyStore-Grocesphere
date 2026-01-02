@@ -13,9 +13,6 @@ const App: React.FC = () => {
   const [user, setUser] = useState<UserState | null>(null);
   const [loading, setLoading] = useState(true);
 
-  /* ============================================================
-     1️⃣ INITIAL SESSION LOAD
-  ============================================================ */
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
@@ -23,7 +20,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
@@ -33,21 +30,18 @@ const App: React.FC = () => {
           setUser({
             ...profile,
             name: profile.full_name,
-            phone: profile.phone_number,
+            phone: profile.phone,
             isAuthenticated: true,
             isDemo: false,
             location: null,
-            role: profile.role
+            role: profile.role,
+            verification_status: profile.approval_status === 'approved' ? 'verified' : (profile.approval_status as any)
           });
       }
       setLoading(false);
     });
   }, []);
 
-  /* ============================================================
-     2️⃣ REAL-TIME VERIFICATION HANDSHAKE
-     Instantly unlocks the terminal when an admin approves
-  ============================================================ */
   useEffect(() => {
     if (!user?.id || user.isDemo) return;
 
@@ -68,7 +62,8 @@ const App: React.FC = () => {
                 ...prev, 
                 ...payload.new,
                 name: payload.new.full_name,
-                phone: payload.new.phone_number 
+                phone: payload.new.phone,
+                verification_status: payload.new.approval_status === 'approved' ? 'verified' : payload.new.approval_status
             };
           });
         }
@@ -81,18 +76,12 @@ const App: React.FC = () => {
   }, [user?.id, user?.isDemo]);
 
   const handleLogout = async () => {
-    if (!user?.isDemo) {
-      await supabase.auth.signOut();
-    }
+    if (!user?.isDemo) await supabase.auth.signOut();
     setUser(null);
   };
 
   const handleLoginSuccess = (userData: UserState) => {
-    setUser({
-        ...userData,
-        isAuthenticated: true,
-        isDemo: false
-    });
+    setUser({ ...userData, isAuthenticated: true, isDemo: false });
   };
 
   const handleDemoStoreLogin = () => {
@@ -117,70 +106,34 @@ const App: React.FC = () => {
     </div>
   );
 
-  if (!user?.isAuthenticated) {
-    return (
-      <Auth
-        onLoginSuccess={handleLoginSuccess}
-        onDemoStore={handleDemoStoreLogin}
-      />
-    );
-  }
+  if (!user?.isAuthenticated) return <Auth onLoginSuccess={handleLoginSuccess} onDemoStore={handleDemoStoreLogin} />;
 
-  /* ============================================================
-     3️⃣ MANUAL APPROVAL GATE
-  ============================================================ */
   if (!user.isDemo && user.verification_status !== 'verified') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
         <div className="w-full max-w-sm bg-white p-12 rounded-[4.5rem] shadow-soft-xl border border-slate-100 flex flex-col items-center gap-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-50">
-                <div className="h-full bg-emerald-500 w-1/4 animate-[audit-slide_2s_infinite_linear]"></div>
-            </div>
-            
-            <style>{`
-                @keyframes audit-slide {
-                    0% { transform: translateX(-100%); }
-                    100% { transform: translateX(400%); }
-                }
-            `}</style>
-
-            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-5xl shadow-inner border border-emerald-100">
-                <span className="animate-bounce">⚖️</span>
-            </div>
-            
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-50"><div className="h-full bg-emerald-500 w-1/4 animate-[audit-slide_2s_infinite_linear]"></div></div>
+            <style>{`@keyframes audit-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }`}</style>
+            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-5xl shadow-inner border border-emerald-100"><span className="animate-bounce">⚖️</span></div>
             <div className="space-y-4">
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Terminal Audit <br/> In Progress</h2>
                 <p className="text-slate-400 text-sm font-medium leading-relaxed">Your business identity is being verified. The terminal will automatically unlock once approved by the Super Admin.</p>
             </div>
-
             <div className="w-full bg-slate-50 p-5 rounded-[2rem] flex flex-col items-center gap-2 border border-slate-100">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Handshake Active</span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Peer Handshake Active</span>
                 </div>
             </div>
-
             <button onClick={handleLogout} className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-red-500 transition-colors">Abort & Logout</button>
         </div>
       </div>
     );
   }
 
-  /* ============================================================
-     4️⃣ ROLE-BASED DASHBOARD ROUTING
-  ============================================================ */
-  if (user.role === 'super_admin' || user.role === 'admin') {
-    return <SuperAdminApp user={user} onLogout={handleLogout} />;
-  }
-
-  if (user.role === 'customer') {
-    return <CustomerApp user={user} onLogout={handleLogout} />;
-  }
-
-  if (user.role === 'delivery_partner') {
-    return <DeliveryApp user={user} onLogout={handleLogout} />;
-  }
-
+  if (user.role === 'super_admin' || user.role === 'admin') return <SuperAdminApp user={user} onLogout={handleLogout} />;
+  if (user.role === 'customer') return <CustomerApp user={user} onLogout={handleLogout} />;
+  if (user.role === 'delivery_partner') return <DeliveryApp user={user} onLogout={handleLogout} />;
   return <StoreApp user={user} onLogout={handleLogout} />;
 };
 
