@@ -36,16 +36,19 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
             id: row.id,
             name: row.name,
             address: row.address,
-            // Comment: Added missing distance property to satisfy Store interface
             distance: '0.0 km',
             verificationStatus: row.approved ? 'verified' : 'pending',
             upiId: row.upi_id,
+            upi_id: row.upi_id,
             type: mapStoreTypeToFrontend(row.store_type),
+            store_type: row.store_type,
             lat: row.lat,
             lng: row.lng,
             rating: 4.5,
             isOpen: row.approved,
+            approved: row.approved,
             ownerId: row.owner_id,
+            owner_id: row.owner_id,
             availableProductIds: []
         } as Store)));
     }
@@ -55,7 +58,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleApprove = async (store: Store) => {
       setLoading(true);
       try {
-          await supabase.from('profiles').update({ approval_status: 'approved' }).eq('id', store.ownerId);
+          await supabase.from('profiles').update({ approval_status: 'approved' }).eq('id', store.owner_id);
           await supabase.from('stores').update({ approved: true }).eq('id', store.id);
           await loadStores();
       } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -64,7 +67,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleReject = async (store: Store) => {
       setLoading(true);
       try {
-          await supabase.from('profiles').update({ approval_status: 'rejected' }).eq('id', store.ownerId);
+          await supabase.from('profiles').update({ approval_status: 'rejected' }).eq('id', store.owner_id);
           await supabase.from('stores').update({ approved: false }).eq('id', store.id);
           await loadStores();
       } catch (e) { console.error(e); } finally { setLoading(false); }

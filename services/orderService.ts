@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Order } from '../types';
 
@@ -9,7 +10,8 @@ export const saveOrder = async (userId: string, order: Order) => {
         customer_id: userId,
         store_id: order.items[0].storeId, 
         status: 'placed',
-        total_amount: order.total,
+        // Comment: Support both total and total_amount for interface compatibility
+        total_amount: order.total || order.total_amount,
         mode: order.mode.toLowerCase(), 
         delivery_lat: order.userLocation?.lat,
         delivery_lng: order.userLocation?.lng,
@@ -62,8 +64,10 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
 
     return (data || []).map((row: any) => ({
         id: row.id,
+        created_at: row.created_at,
         date: row.created_at,
-        items: [], // Requires follow-up query to order_items
+        items: [], // Requires follow-up query to order_items for full item details
+        total_amount: parseFloat(row.total_amount),
         total: parseFloat(row.total_amount),
         status: row.status as any,
         paymentStatus: 'PAID',
@@ -74,7 +78,7 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
         storeLocation: row.stores ? { lat: row.stores.lat, lng: row.stores.lng } : undefined,
         userLocation: { lat: row.delivery_lat, lng: row.delivery_lng },
         transactionId: row.transaction_ref
-    }));
+    } as Order));
   } catch (err) {
     console.error('Supabase fetch failed:', err);
     return [];
