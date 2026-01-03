@@ -18,32 +18,20 @@ export interface Product {
   name: string;
   price: number; 
   mrp?: number; 
-  costPrice?: number;
+  offerPrice?: number;
   emoji: string;
   imageUrl?: string;
   category: string;
   description?: string;
+  // Added properties to resolve errors in constants.ts and geminiService.ts
+  brands?: BrandOption[];
   ingredients?: string;
   nutrition?: string;
-  brands?: BrandOption[]; 
 }
 
-export type StoreType = 'Vegetables/Fruits' | 'Daily Needs / Milk Booth' | 'General Store' | 'Local Mart';
-
-export interface BankDetails {
-  accountNumber: string;
-  ifscCode: string;
-  bankName: string;
-  accountHolder: string;
-}
-
-export interface AdCampaign {
-  id: string;
-  title: string;
-  description: string;
-  productId?: string;
-  status: 'active' | 'scheduled' | 'expired';
-}
+// Backend Enum: 'dairy', 'vegetables', 'mini_mart', 'big_mart'
+// Expanded with human-readable types used in the frontend and OSM mapping
+export type StoreType = 'dairy' | 'vegetables' | 'mini_mart' | 'big_mart' | 'Daily Needs / Milk Booth' | 'Vegetables/Fruits' | 'General Store' | 'Local Mart';
 
 export interface Store {
   id: string;
@@ -55,15 +43,13 @@ export interface Store {
   lng: number;
   isOpen: boolean;
   type: StoreType; 
-  availableProductIds: string[]; 
   upiId?: string; 
   ownerId?: string; 
-  openingTime?: string; 
-  closingTime?: string; 
-  gstNumber?: string;
-  bankDetails?: BankDetails;
   verificationStatus: 'pending' | 'verified' | 'rejected';
-  ads?: AdCampaign[];
+  serviceFeePaidUntil?: string; // 15-day service fee check
+  // Added properties for UserProfile.tsx
+  gstNumber?: string;
+  bankDetails?: any;
 }
 
 export interface InventoryItem extends Product {
@@ -71,29 +57,17 @@ export interface InventoryItem extends Product {
   stock: number; 
   storePrice: number; 
   isActive: boolean; 
-  brandDetails?: Record<string, BrandInventoryInfo>; 
 }
 
-export interface CartItem extends Product {
-  quantity: number;
-  selectedBrand: string;     
-  originalProductId: string; 
-  storeId: string;
-  storeName: string;
-  storeType: Store['type'];
-  costPrice?: number;
-}
-
-export type OrderMode = 'DELIVERY' | 'PICKUP';
-export type DeliveryType = 'INSTANT' | 'SCHEDULED';
-export type PaymentMethod = 'ONLINE' | 'DIRECT';
+export type OrderMode = 'delivery' | 'pickup' | 'DELIVERY' | 'PICKUP';
+export type OrderStatus = 'placed' | 'accepted' | 'packed' | 'ready' | 'on_way' | 'delivered' | 'cancelled' | 'packing' | 'picked_up';
 
 export interface SavedCard {
-  id: string;
-  type: 'VISA' | 'MASTERCARD' | 'UPI';
-  last4?: string; 
-  upiId?: string; 
-  label: string;
+    id: string;
+    type: 'VISA' | 'MASTERCARD' | 'UPI';
+    last4?: string;
+    upiId?: string;
+    label: string;
 }
 
 export interface UserState {
@@ -105,52 +79,49 @@ export interface UserState {
   name?: string;
   address?: string;
   location: { lat: number; lng: number } | null;
-  savedCards?: SavedCard[];
-  role?: 'customer' | 'store_owner' | 'delivery_partner' | 'admin' | 'super_admin';
+  role?: 'customer' | 'store' | 'delivery' | 'admin' | 'super_admin' | 'store_owner' | 'delivery_partner';
   verification_status?: 'pending' | 'verified' | 'rejected';
+  // Added for compatibility with userService.ts and login logic
   verificationStatus?: 'pending' | 'verified' | 'rejected';
-  gstNumber?: string;
-  licenseNumber?: string;
   upiId?: string;
-  bankDetails?: BankDetails;
+  savedCards?: SavedCard[];
+  bankDetails?: any;
 }
 
-export interface LocationResult {
-  latitude: number;
-  longitude: number;
-}
+// Types for Cart and Payments used in CartSheet and CustomerApp
+export type DeliveryType = 'INSTANT' | 'SCHEDULED';
+export type PaymentMethod = 'ONLINE' | 'DIRECT';
 
-export interface PaymentSplit {
-  storeAmount: number;
-  storeUpi?: string;
-  handlingFee?: number; 
-  adminUpi?: string;
-  deliveryFee: number; 
-  driverUpi?: string;
-  transactionId?: string;
+export interface CartItem extends Product {
+  quantity: number;
+  storeId: string;
+  storeName: string;
+  storeType: StoreType;
+  originalProductId: string;
+  selectedBrand?: string;
 }
 
 export interface Order {
   id: string;
   date: string;
-  items: CartItem[];
+  items: any[];
   total: number;
-  status: 'placed' | 'accepted' | 'packing' | 'ready' | 'on_way' | 'delivered' | 'picked_up' | 'cancelled' | 'rejected';
+  status: OrderStatus;
   paymentStatus: 'PAID' | 'PENDING';
-  paymentMethod: PaymentMethod;
-  paymentDeadline?: string; 
+  paymentMethod?: PaymentMethod;
   mode: OrderMode;
-  deliveryType: DeliveryType;
-  scheduledTime?: string;
-  deliveryAddress?: string;
   storeName: string;
-  storeLocation?: { lat: number; lng: number };
-  userLocation?: { lat: number; lng: number };
-  driverLocation?: { lat: number; lng: number }; // Live GPS coordinates
-  splits?: PaymentSplit;
   customerName?: string;
   customerPhone?: string;
+  deliveryPartnerId?: string;
+  storeLocation?: { lat: number; lng: number };
+  userLocation?: { lat: number; lng: number };
+  driverLocation?: { lat: number; lng: number };
   transactionId?: string;
+  // Added properties for MyOrders.tsx and order saving logic
+  deliveryAddress?: string;
+  scheduledTime?: string;
+  splits?: any;
 }
 
 export interface Settlement {

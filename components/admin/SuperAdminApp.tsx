@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserState, Store } from '../../types';
 import { supabase } from '../../services/supabaseClient';
@@ -35,6 +36,8 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
             id: row.id,
             name: row.name,
             address: row.address,
+            // Comment: Added missing distance property to satisfy Store interface
+            distance: '0.0 km',
             verificationStatus: row.approved ? 'verified' : 'pending',
             upiId: row.upi_id,
             type: mapStoreTypeToFrontend(row.store_type),
