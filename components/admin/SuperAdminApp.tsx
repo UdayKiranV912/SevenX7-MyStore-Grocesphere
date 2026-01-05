@@ -38,16 +38,13 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
             address: row.address,
             distance: '0.0 km',
             verificationStatus: row.approved ? 'verified' : 'pending',
-            upiId: row.upi_id,
             upi_id: row.upi_id,
-            type: mapStoreTypeToFrontend(row.store_type),
             store_type: row.store_type,
             lat: row.lat,
             lng: row.lng,
             rating: 4.5,
             isOpen: row.approved,
-            approved: row.approved,
-            ownerId: row.owner_id,
+            status: row.approved ? 'active' : 'inactive',
             owner_id: row.owner_id,
             availableProductIds: []
         } as Store)));

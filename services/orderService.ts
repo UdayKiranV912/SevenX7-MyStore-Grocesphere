@@ -66,19 +66,21 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
         id: row.id,
         created_at: row.created_at,
         date: row.created_at,
+        store_id: row.store_id,
+        customer_id: row.customer_id,
         items: [], // Requires follow-up query to order_items for full item details
         total_amount: parseFloat(row.total_amount),
         total: parseFloat(row.total_amount),
         status: row.status as any,
         paymentStatus: 'PAID',
         paymentMethod: 'ONLINE',
-        mode: row.mode?.toUpperCase() || 'DELIVERY',
+        mode: row.mode?.toLowerCase() === 'delivery' ? 'delivery' : 'pickup',
         deliveryType: 'INSTANT',
         storeName: row.stores?.name || 'Community Mart',
         storeLocation: row.stores ? { lat: row.stores.lat, lng: row.stores.lng } : undefined,
         userLocation: { lat: row.delivery_lat, lng: row.delivery_lng },
         transactionId: row.transaction_ref
-    } as Order));
+    } as unknown as Order));
   } catch (err) {
     console.error('Supabase fetch failed:', err);
     return [];

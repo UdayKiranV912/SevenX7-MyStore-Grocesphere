@@ -7,7 +7,7 @@ import { MOCK_STORES } from "../constants";
 const CLOUDFLARE_WORKER_URL = ''; // e.g., 'https://your-worker.your-name.workers.dev'
 
 // Helper to assign inventory based on type
-const assignInventory = (type: Store['type']): string[] => {
+const assignInventory = (type: Store['store_type']): string[] => {
   const range = (start: number, end: number) => Array.from({length: end - start + 1}, (_, i) => String(start + i));
   
   // Comment: Fix type comparison by using defined StoreType literals
@@ -53,7 +53,7 @@ export const findNearbyStores = async (lat: number, lng: number): Promise<Store[
     if (CLOUDFLARE_WORKER_URL) {
         const response = await fetch(`${CLOUDFLARE_WORKER_URL}/stores?lat=${lat}&lng=${lng}&radius=2000`);
         if (response.ok) {
-            const data = await response.json();
+            // const data = await response.json();
             // ... process data ...
         }
     }
@@ -118,8 +118,8 @@ export const findNearbyStores = async (lat: number, lng: number): Promise<Store[
       })
       .map((node: any) => {
         const tags = node.tags;
-        // Comment: Fix initial type by using correct StoreType literal
-        let type: Store['type'] = 'General Store';
+        // Comment: Use store_type instead of type to match Store interface
+        let type: Store['store_type'] = 'General Store';
         
         // Determine type based on OSM tags
         if (tags.shop === 'greengrocer' || tags.shop === 'farm' || tags.shop === 'vegetable') {
@@ -137,11 +137,14 @@ export const findNearbyStores = async (lat: number, lng: number): Promise<Store[
           lat: node.lat,
           lng: node.lon,
           isOpen: true,
-          type: type,
+          status: 'active',
+          upi_id: 'osm@upi',
+          owner_id: 'osm',
+          store_type: type,
           availableProductIds: assignInventory(type),
           openingTime: '08:00 AM', 
           closingTime: '09:00 PM'  
-        };
+        } as Store;
       })
       .slice(0, 15); // Limit to closest 15
 

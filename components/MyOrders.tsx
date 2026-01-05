@@ -100,7 +100,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       const deliverySteps = ['placed', 'packing', 'on_way', 'delivered'];
       const pickupSteps = ['placed', 'packing', 'ready', 'picked_up'];
       
-      const steps = mode === 'DELIVERY' ? deliverySteps : pickupSteps;
+      const steps = mode === 'delivery' ? deliverySteps : pickupSteps;
       const currentIndex = steps.indexOf(status);
       const progress = ((currentIndex) / (steps.length - 1)) * 100;
 
@@ -188,6 +188,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
 
         const mapStore: Store = {
             id: `order-store-${order.id}`,
+            owner_id: order.store_id || 'store',
             name: order.storeName || 'Store',
             lat: isValidCoord(order.storeLocation?.lat) ? order.storeLocation!.lat : 12.9716,
             lng: isValidCoord(order.storeLocation?.lng) ? order.storeLocation!.lng : 77.5946,
@@ -195,7 +196,9 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
             rating: 0,
             distance: '',
             isOpen: true,
-            type: 'General Store',
+            status: 'active',
+            upi_id: 'store@upi',
+            store_type: 'General Store',
             availableProductIds: [],
             verificationStatus: 'verified'
         };
@@ -216,10 +219,10 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                   <h3 className="font-black text-slate-900 text-lg leading-tight">{order.storeName}</h3>
                   <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs font-bold text-slate-400 uppercase">
-                          {new Date(order.date).toLocaleDateString()}
+                          {new Date(order.created_at).toLocaleDateString()}
                       </span>
                       <span className="text-xs font-black text-slate-300">•</span>
-                      <span className="text-xs font-bold text-slate-800">₹{order.total}</span>
+                      <span className="text-xs font-bold text-slate-800">₹{order.total_amount}</span>
                   </div>
                </div>
                <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border border-transparent ${statusColor}`}>
@@ -275,8 +278,8 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
                             <MapVisualizer
                                 stores={[mapStore]}
                                 selectedStore={mapStore}
-                                userLat={realTimeUserLoc?.lat || isValidCoord(userLocation?.lat) ? userLocation!.lat : 12.9716}
-                                userLng={realTimeUserLoc?.lng || isValidCoord(userLocation?.lng) ? userLocation!.lng : 77.5946}
+                                userLat={realTimeUserLoc?.lat || (isValidCoord(userLocation?.lat) ? userLocation!.lat : 12.9716)}
+                                userLng={realTimeUserLoc?.lng || (isValidCoord(userLocation?.lng) ? userLocation!.lng : 77.5946)}
                                 mode={order.mode}
                                 onSelectStore={() => {}}
                                 showRoute={true}

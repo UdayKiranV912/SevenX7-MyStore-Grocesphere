@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserState, Store, StoreType } from '../types';
 import { updateUserProfile } from '../services/userService';
@@ -12,10 +13,10 @@ interface UserProfileProps {
 }
 
 const STORE_TYPES: StoreType[] = [
-    'Vegetables/Fruits',
-    'Daily Needs / Milk Booth',
-    'General Store',
-    'Local Mart'
+    'vegetables',
+    'dairy',
+    'mini_mart',
+    'big_mart'
 ];
 
 export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, onLogout }) => {
@@ -29,7 +30,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
     phone: user.phone || '', 
     storeName: '',
     address: user.address || '',
-    type: 'Local Mart' as StoreType,
+    type: 'big_mart' as StoreType,
     gstNumber: '',
     upiId: user.upiId || '',
     bankName: user.bankDetails?.bankName || '',
@@ -48,9 +49,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
                       ...prev, 
                       storeName: store.name, 
                       address: store.address,
-                      type: store.type as StoreType,
+                      type: store.store_type as StoreType,
                       gstNumber: store.gstNumber || '',
-                      upiId: store.upiId || '',
+                      upiId: store.upi_id || '',
                       bankName: store.bankDetails?.bankName || '',
                       accNo: store.bankDetails?.accountNumber || '',
                       ifsc: store.bankDetails?.ifscCode || '',
@@ -78,9 +79,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
           await updateStoreProfile(storeData.id, { 
             name: formData.storeName, 
             address: formData.address,
-            type: formData.type,
+            store_type: formData.type,
             gstNumber: formData.gstNumber,
-            upiId: formData.upiId,
+            upi_id: formData.upiId,
             bankDetails: {
                 bankName: formData.bankName,
                 accountNumber: formData.accNo,

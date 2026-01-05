@@ -28,7 +28,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filterType, setFilterType] = useState<'ALL' | Store['type']>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | Store['store_type']>('ALL');
   const [sortBy, setSortBy] = useState<'DISTANCE' | 'RATING'>('DISTANCE');
   const [currentAddress, setCurrentAddress] = useState<string>(user.address || 'Locating...');
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(user.location);
@@ -103,7 +103,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
 
   const processedStores = useMemo(() => {
     let filtered = stores;
-    if (filterType !== 'ALL') filtered = stores.filter(s => s.type === filterType);
+    if (filterType !== 'ALL') filtered = stores.filter(s => s.store_type === filterType);
     return [...filtered].sort((a, b) => {
         if (sortBy === 'RATING') return b.rating - a.rating;
         return parseFloat(a.distance) - parseFloat(b.distance);
@@ -129,7 +129,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
             selectedBrand: brandName,
             storeId: selectedStore.id,
             storeName: selectedStore.name,
-            storeType: selectedStore.type
+            storeType: selectedStore.store_type
         }];
     });
   };
@@ -139,13 +139,17 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
       
       const newOrder: Order = {
           id: `ord-${Date.now()}`, 
+          created_at: new Date().toISOString(),
           date: new Date().toISOString(), 
           items: cart, 
+          store_id: cart[0].storeId,
+          customer_id: user.id,
+          total_amount: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) + (pendingOrderDetails.splits.deliveryFee || 0),
           total: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) + (pendingOrderDetails.splits.deliveryFee || 0),
           status: 'placed', 
           paymentStatus: 'PAID',
           paymentMethod: pendingOrderDetails.paymentMethod,
-          mode: 'DELIVERY', 
+          mode: 'delivery', 
           deliveryType: pendingOrderDetails.deliveryType, 
           scheduledTime: pendingOrderDetails.scheduledTime,
           deliveryAddress: currentAddress, 
@@ -153,8 +157,9 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
           storeLocation: selectedStore ? { lat: selectedStore.lat, lng: selectedStore.lng } : undefined,
           userLocation: currentLocation || undefined, 
           splits: { ...pendingOrderDetails.splits, transactionId: txnId },
-          customerName: user.name, 
-          customerPhone: user.phone,
+          // Comment: Corrected customer fields to snake_case
+          customer_name: user.name, 
+          customer_phone: user.phone,
           transactionId: txnId
       };
 
@@ -191,7 +196,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
         <main className="h-screen w-full relative">
             {activeView === 'HOME' && (
                 <div className="h-full w-full relative">
-                     <MapVisualizer stores={processedStores} userLat={currentLocation?.lat || null} userLng={currentLocation?.lng || null} selectedStore={selectedStore} onSelectStore={(s) => { setSelectedStore(s); }} mode="DELIVERY" enableLiveTracking={true} />
+                     <MapVisualizer stores={processedStores} userLat={currentLocation?.lat || null} userLng={currentLocation?.lng || null} selectedStore={selectedStore} onSelectStore={(s) => { setSelectedStore(s); }} mode="delivery" enableLiveTracking={true} />
 
                      <div className={`absolute bottom-0 left-0 right-0 z-[500] bg-white rounded-t-[3.5rem] shadow-2xl transition-all duration-500 ${isMapExpanded ? 'h-[45vh]' : 'h-[85vh]'} flex flex-col border-t border-slate-100`}>
                          <div className="w-full h-10 flex items-center justify-center shrink-0 cursor-pointer" onClick={() => setIsMapExpanded(!isMapExpanded)}>
@@ -218,7 +223,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
                              <div className="space-y-5">
                                  {processedStores.map(store => (
                                      <div key={store.id} onClick={() => { setSelectedStore(store); setActiveView('STORE'); }} className="bg-slate-50/50 p-6 rounded-[3rem] border border-slate-100 flex items-center gap-6 cursor-pointer hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all active:scale-[0.98]">
-                                         <div className={`w-16 h-16 rounded-3xl flex items-center justify-center text-4xl text-white shadow-lg ${store.type === 'Vegetables/Fruits' ? 'bg-emerald-500' : store.type === 'Daily Needs / Milk Booth' ? 'bg-blue-500' : 'bg-orange-500'}`}>🏪</div>
+                                         <div className={`w-16 h-16 rounded-3xl flex items-center justify-center text-4xl text-white shadow-lg ${store.store_type === 'Vegetables/Fruits' ? 'bg-emerald-500' : store.store_type === 'Daily Needs / Milk Booth' ? 'bg-blue-500' : 'bg-orange-500'}`}>🏪</div>
                                          <div className="flex-1 min-w-0">
                                              <h3 className="font-black text-slate-900 text-lg truncate mb-1">{store.name}</h3>
                                              <div className="flex items-center gap-3 text-[11px] font-black text-slate-400 uppercase tracking-widest">
@@ -267,6 +272,7 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({ user, onLogout, onUpda
 
         <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-slate-100 px-10 py-6 flex justify-between z-[1000] max-w-lg mx-auto rounded-t-[3.5rem] shadow-float">
            {[{ id: 'HOME', icon: '🏠', label: 'Preview' }, { id: 'ORDERS', icon: '🧾', label: 'History' }, { id: 'PROFILE', icon: '👤', label: 'Profile' }].map(item => (
+             // Comment: Corrected setActiveTab to setActiveView
              <button key={item.id} onClick={() => setActiveView(item.id as any)} className={`flex flex-col items-center gap-2 transition-all ${activeView === item.id ? 'text-slate-900 scale-110' : 'text-slate-300'}`}>
                 <span className="text-2xl">{item.icon}</span>
                 <span className="text-[9px] font-black uppercase tracking-[0.2em] leading-none">{item.label}</span>
