@@ -131,6 +131,7 @@ export const findNearbyStores = async (lat: number, lng: number): Promise<Store[
         return {
           id: `osm-${node.id}`,
           name: tags.name,
+          store_name: tags.name,
           address: tags['addr:street'] || tags['addr:suburb'] || `${tags.shop || 'Local'} Store`,
           rating: 4.0 + (Math.random() * 1.0), // Simulate rating
           distance: `${calculateDistance(lat, lng, node.lat, node.lon).toFixed(1)} km`,
@@ -139,11 +140,16 @@ export const findNearbyStores = async (lat: number, lng: number): Promise<Store[
           isOpen: true,
           status: 'active',
           upi_id: 'osm@upi',
+          upiId: 'osm@upi',
           owner_id: 'osm',
           store_type: type,
           availableProductIds: assignInventory(type),
           openingTime: '08:00 AM', 
-          closingTime: '09:00 PM'  
+          closingTime: '09:00 PM',
+          emoji: type === 'Vegetables/Fruits' ? '🥦' : type === 'Daily Needs / Milk Booth' ? '🥛' : '🏪',
+          approved: true,
+          active: true,
+          verificationStatus: 'verified'
         } as Store;
       })
       .slice(0, 15); // Limit to closest 15

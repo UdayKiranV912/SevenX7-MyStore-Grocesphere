@@ -69,14 +69,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         subscription = subscribeToUserOrders(userId, (updatedOrderDb) => {
             setOrders(prev => prev.map(o => {
                 if (o.id === updatedOrderDb.id) {
-                    let appStatus: Order['status'] = 'placed';
-                    if (updatedOrderDb.status === 'packing') appStatus = 'packing';
-                    if (updatedOrderDb.status === 'ready') appStatus = 'ready';
-                    if (updatedOrderDb.status === 'on_way') appStatus = 'on_way';
-                    if (updatedOrderDb.status === 'delivered') appStatus = 'delivered';
-                    if (updatedOrderDb.status === 'picked_up') appStatus = 'picked_up';
-                    if (updatedOrderDb.status === 'cancelled') appStatus = 'cancelled';
-                    
+                    let appStatus: Order['status'] = updatedOrderDb.status;
                     return { 
                       ...o, 
                       status: appStatus,
@@ -97,29 +90,30 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
   }, [userId]);
 
   const getStatusInfo = (status: string, mode: OrderMode) => {
-      const deliverySteps = ['placed', 'packing', 'on_way', 'delivered'];
-      const pickupSteps = ['placed', 'packing', 'ready', 'picked_up'];
+      const deliverySteps = ['PLACED', 'PACKING', 'ON_THE_WAY', 'DELIVERED'];
+      const pickupSteps = ['PLACED', 'PACKING', 'READY', 'picked_up'];
       
-      const steps = mode === 'delivery' ? deliverySteps : pickupSteps;
-      const currentIndex = steps.indexOf(status);
-      const progress = ((currentIndex) / (steps.length - 1)) * 100;
+      const normalizedStatus = status.toUpperCase();
+      const steps = (mode.toUpperCase() === 'DELIVERY' || mode === 'delivery') ? deliverySteps : pickupSteps;
+      const currentIndex = steps.indexOf(normalizedStatus);
+      const progress = currentIndex === -1 ? 0 : ((currentIndex) / (steps.length - 1)) * 100;
 
       const getLabel = (step: string) => {
-          if (step === 'placed') return 'Placed';
-          if (step === 'packing') return 'Packing';
-          if (step === 'on_way') return 'On Way';
-          if (step === 'ready') return 'Ready';
-          if (step === 'picked_up') return 'Picked Up';
-          if (step === 'delivered') return 'Delivered';
+          if (step === 'PLACED') return 'Placed';
+          if (step === 'PACKING') return 'Packing';
+          if (step === 'ON_THE_WAY') return 'On Way';
+          if (step === 'READY') return 'Ready';
+          if (step === 'picked_up' || step === 'PICKED_UP') return 'Picked Up';
+          if (step === 'DELIVERED') return 'Delivered';
           return step;
       };
 
       const getIcon = (step: string) => {
-          if (step === 'placed') return '📝';
-          if (step === 'packing') return '🥡';
-          if (step === 'on_way') return '🛵';
-          if (step === 'ready') return '🛍️';
-          if (step === 'delivered' || step === 'picked_up') return '🏠';
+          if (step === 'PLACED') return '📝';
+          if (step === 'PACKING') return '🥡';
+          if (step === 'ON_THE_WAY') return '🛵';
+          if (step === 'READY') return '🛍️';
+          if (step === 'DELIVERED' || step === 'picked_up' || step === 'PICKED_UP') return '🏠';
           return '•';
       };
 
@@ -133,7 +127,8 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       }
 
       // 2. FOR DEMO MODE: MOCK SIMULATION WITH REAL-TIME ANCHOR
-      const isLiveTracking = order.status === 'on_way' || order.status === 'packing';
+      const normalizedStatus = order.status.toUpperCase();
+      const isLiveTracking = normalizedStatus === 'ON_THE_WAY' || normalizedStatus === 'PACKING';
       if (!isLiveTracking || !order.storeLocation) return undefined;
       
       // Use real browser location as destination if available, otherwise fallback to store offset
@@ -148,7 +143,7 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       const progress = t / loopDuration;
 
       // Phase 1: Rider -> Store (Pickup)
-      if (order.status === 'packing') {
+      if (normalizedStatus === 'PACKING') {
           const startLat = order.storeLocation.lat + 0.005;
           const startLng = order.storeLocation.lng + 0.005;
           return {
@@ -174,8 +169,9 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
       
       {orders.map((order, idx) => {
         const isExpanded = expandedOrderId === order.id;
-        const isCompleted = order.status === 'delivered' || order.status === 'picked_up';
-        const isCancelled = order.status === 'cancelled';
+        const normalizedStatus = order.status.toUpperCase();
+        const isCompleted = normalizedStatus === 'DELIVERED' || normalizedStatus === 'PICKED_UP';
+        const isCancelled = normalizedStatus === 'CANCELLED';
         const isPaymentPending = order.paymentStatus === 'PENDING';
         
         const { steps, currentIndex, progress, getLabel, getIcon } = getStatusInfo(order.status, order.mode);
@@ -183,12 +179,13 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
         let statusColor = 'bg-blue-50 text-blue-700';
         if (isCompleted) statusColor = 'bg-green-50 text-green-700';
         if (isCancelled) statusColor = 'bg-red-50 text-red-700';
-        if (order.status === 'placed') statusColor = 'bg-yellow-50 text-yellow-700';
+        if (normalizedStatus === 'PLACED') statusColor = 'bg-yellow-50 text-yellow-700';
         if (isPaymentPending) statusColor = 'bg-orange-50 text-orange-700';
 
         const mapStore: Store = {
             id: `order-store-${order.id}`,
             owner_id: order.store_id || 'store',
+            store_name: order.storeName || 'Store',
             name: order.storeName || 'Store',
             lat: isValidCoord(order.storeLocation?.lat) ? order.storeLocation!.lat : 12.9716,
             lng: isValidCoord(order.storeLocation?.lng) ? order.storeLocation!.lng : 77.5946,
@@ -200,12 +197,17 @@ export const MyOrders: React.FC<MyOrdersProps> = ({ userLocation, onPayNow, user
             upi_id: 'store@upi',
             store_type: 'General Store',
             availableProductIds: [],
-            verificationStatus: 'verified'
+            verificationStatus: 'verified',
+            approved: true,
+            active: true,
+            emoji: '🏪',
+            openingTime: '08:00 AM',
+            closingTime: '09:00 PM'
         };
         
         const driverPos = getSimulatedDriverPos(order);
         const isRealUser = userId && !userId.includes('demo');
-        const showMap = !isCancelled && !isCompleted && order.storeLocation && !isPaymentPending && (isRealUser ? (!!order.driverLocation || order.status === 'on_way' || order.status === 'packing') : true);
+        const showMap = !isCancelled && !isCompleted && order.storeLocation && !isPaymentPending && (isRealUser ? (!!order.driverLocation || normalizedStatus === 'ON_THE_WAY' || normalizedStatus === 'PACKING') : true);
 
         return (
           <div 

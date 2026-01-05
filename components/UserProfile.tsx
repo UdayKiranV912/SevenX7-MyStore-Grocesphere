@@ -47,10 +47,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
                   setStoreData(store);
                   setFormData(prev => ({ 
                       ...prev, 
-                      storeName: store.name, 
+                      storeName: store.store_name, 
                       address: store.address,
                       type: store.store_type as StoreType,
-                      gstNumber: store.gstNumber || '',
+                      gstNumber: store.gst_number || '',
                       upiId: store.upi_id || '',
                       bankName: store.bankDetails?.bankName || '',
                       accNo: store.bankDetails?.accountNumber || '',
@@ -72,15 +72,15 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
             name: formData.ownerName, 
             email: formData.email, 
             phone: formData.phone 
-          });
+          } as any);
       }
 
       if (storeData) {
           await updateStoreProfile(storeData.id, { 
-            name: formData.storeName, 
+            store_name: formData.storeName, 
             address: formData.address,
             store_type: formData.type,
-            gstNumber: formData.gstNumber,
+            gst_number: formData.gstNumber,
             upi_id: formData.upiId,
             bankDetails: {
                 bankName: formData.bankName,
@@ -137,7 +137,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser, on
         <div className="flex justify-between items-center mb-10">
             <h4 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.2em]">Business Terminal</h4>
             {!isEditing && (
-                <button onClick={() => setIsEditing(true)} className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl uppercase tracking-widest border border-emerald-100 shadow-sm">
+                <button onClick={() => setIsEditing(true)} className="text-[10px] font-black text-emerald-600 bg-emerald-50 ambassador px-4 py-2 rounded-xl uppercase tracking-widest border border-emerald-100 shadow-sm">
                     Edit
                 </button>
             )}

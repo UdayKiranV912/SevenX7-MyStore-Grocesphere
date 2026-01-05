@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Store, Product } from '../types';
 
@@ -22,7 +23,8 @@ export const fetchLiveStores = async (lat: number, lng: number): Promise<Store[]
 
     return dbStores.map(store => ({
         id: store.id,
-        name: store.name,
+        name: store.name || store.store_name,
+        store_name: store.store_name,
         address: store.address || '',
         rating: 4.5,
         distance: 'Local', 
@@ -30,9 +32,18 @@ export const fetchLiveStores = async (lat: number, lng: number): Promise<Store[]
         lng: store.lng,
         isOpen: store.approved,
         type: mapStoreTypeToFrontend(store.store_type),
+        store_type: mapStoreTypeToFrontend(store.store_type),
         availableProductIds: [],
-        verificationStatus: 'verified'
-    }));
+        verificationStatus: 'verified',
+        emoji: store.emoji || '🏪',
+        approved: store.approved,
+        active: store.active,
+        upi_id: store.upi_id,
+        owner_id: store.owner_id,
+        status: 'active',
+        openingTime: '08:00 AM',
+        closingTime: '09:00 PM'
+    } as Store));
 
   } catch (error) {
     console.error("Error fetching live stores:", error);

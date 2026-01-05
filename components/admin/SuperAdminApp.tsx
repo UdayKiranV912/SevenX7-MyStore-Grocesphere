@@ -34,11 +34,13 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
     if (!error && data) {
         setStores(data.map((row: any) => ({
             id: row.id,
-            name: row.name,
+            name: row.store_name,
+            store_name: row.store_name,
             address: row.address,
             distance: '0.0 km',
             verificationStatus: row.approved ? 'verified' : 'pending',
             upi_id: row.upi_id,
+            upiId: row.upi_id,
             store_type: row.store_type,
             lat: row.lat,
             lng: row.lng,
@@ -46,7 +48,12 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
             isOpen: row.approved,
             status: row.approved ? 'active' : 'inactive',
             owner_id: row.owner_id,
-            availableProductIds: []
+            availableProductIds: [],
+            emoji: row.emoji || '🏪',
+            approved: row.approved,
+            active: row.active,
+            openingTime: '08:00 AM',
+            closingTime: '09:00 PM'
         } as Store)));
     }
     setLoading(false);
@@ -55,7 +62,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleApprove = async (store: Store) => {
       setLoading(true);
       try {
-          await supabase.from('profiles').update({ approval_status: 'approved' }).eq('id', store.owner_id);
+          await supabase.from('profiles').update({ admin_approved: true }).eq('id', store.owner_id);
           await supabase.from('stores').update({ approved: true }).eq('id', store.id);
           await loadStores();
       } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -64,7 +71,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
   const handleReject = async (store: Store) => {
       setLoading(true);
       try {
-          await supabase.from('profiles').update({ approval_status: 'rejected' }).eq('id', store.owner_id);
+          await supabase.from('profiles').update({ admin_approved: false }).eq('id', store.owner_id);
           await supabase.from('stores').update({ approved: false }).eq('id', store.id);
           await loadStores();
       } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -109,7 +116,7 @@ export const SuperAdminApp: React.FC<SuperAdminAppProps> = ({ user, onLogout }) 
                                               {store.verificationStatus === 'verified' ? '✓' : '!'}
                                           </div>
                                           <div>
-                                              <h3 className="font-black text-xl text-white">{store.name}</h3>
+                                              <h3 className="font-black text-xl text-white">{store.name || store.store_name}</h3>
                                               <p className="text-xs text-slate-400 font-bold uppercase">{store.address}</p>
                                           </div>
                                       </div>

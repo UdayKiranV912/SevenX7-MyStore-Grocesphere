@@ -1,23 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { UserState, SavedCard } from '../types';
-
-const MOCK_CARDS: SavedCard[] = [
-    { id: 'c1', type: 'VISA', last4: '4242', label: 'Personal Card' },
-    { id: 'u1', type: 'UPI', upiId: 'user@okaxis', label: 'Primary UPI' }
-];
-
-const mapRoleToBackend = (role: string): any => {
-    if (role === 'store_owner') return 'store';
-    if (role === 'delivery_partner') return 'delivery';
-    return role;
-};
-
-const mapRoleToFrontend = (role: string): any => {
-    if (role === 'store') return 'store_owner';
-    if (role === 'delivery') return 'delivery_partner';
-    return role;
-};
+import { UserState, Profile } from '../types';
 
 export const registerUser = async (
     email: string, 
@@ -25,11 +8,12 @@ export const registerUser = async (
     fullName: string, 
     phone: string, 
     upiId: string, 
-    role: UserState['role'] = 'store_owner',
+    role: 'customer' | 'store' | 'delivery' = 'store',
     storeName?: string,
-    storeAddress?: string
+    storeAddress?: string,
+    storeType?: string
 ): Promise<UserState> => {
-    const { data: authData, error: authError } = await (supabase.auth as any).signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -43,36 +27,42 @@ export const registerUser = async (
     if (authError) throw authError;
     if (!authData.user) throw new Error("Registration failed.");
 
-    const backendRole = mapRoleToBackend(role);
-
-    // Initial profile setup - explicit pending status
+    // Initial profile setup - Admin approval mandatory (set to false)
     const { error: profileError } = await supabase
         .from('profiles')
         .insert({
             id: authData.user.id,
             email: email,
-            full_name: fullName,
+            name: fullName,
             phone: phone,
-            role: backendRole,
-            status: 'pending', // Approval Status enum
+            role: role,
             upi_id: upiId,
-            is_active: false,
-            fee_paid_until: new Date(Date.now() + 86400000).toISOString() // 1 day grace for setup
+            admin_approved: false,
+            active: true
         });
 
     if (profileError) throw profileError;
 
-    if (role === 'store_owner' && storeName) {
+    if (role === 'store' && storeName) {
+        // Map common emojis for auto-assignment based on store type
+        const typeEmojis: Record<string, string> = {
+            'DAIRY': '🥛',
+            'VEG_FRUIT': '🥦',
+            'MINI_MART': '🏪',
+            'BIG_MART': '🛒'
+        };
+
         await supabase
             .from('stores')
             .insert({
                 owner_id: authData.user.id,
-                name: storeName,
+                store_name: storeName,
                 address: storeAddress || 'Address Pending',
                 upi_id: upiId,
-                store_type: 'mini_mart',
-                approved: false, // Store specific approval
-                status: 'inactive',
+                store_type: storeType || 'MINI_MART',
+                emoji: typeEmojis[storeType || 'MINI_MART'] || '🏬',
+                approved: false,
+                active: true,
                 lat: 12.9716, 
                 lng: 77.5946
             });
@@ -85,16 +75,14 @@ export const registerUser = async (
         email: email,
         name: fullName,
         address: storeAddress || '',
-        savedCards: [],
-        location: null,
         role: role,
         upiId: upiId,
-        verification_status: 'pending'
+        admin_approved: false
     };
 };
 
 export const loginUser = async (email: string, password: string): Promise<UserState> => {
-    const { data: authData, error: authError } = await (supabase.auth as any).signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
     });
@@ -117,29 +105,15 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         id: profileData.id,
         phone: profileData.phone || '',
         email: profileData.email || '',
-        name: profileData.full_name || '',
-        address: profileData.address || '',
-        savedCards: MOCK_CARDS,
-        location: null,
-        role: mapRoleToFrontend(profileData.role),
+        name: profileData.name || '',
+        address: '',
+        role: profileData.role,
         upiId: profileData.upi_id,
-        verification_status: profileData.status === 'approved' ? 'verified' : profileData.status,
-        verificationStatus: profileData.status === 'approved' ? 'verified' : profileData.status
+        admin_approved: profileData.admin_approved
     };
 };
 
-export const updateUserProfile = async (id: string, updates: any) => {
-  const dbPayload: any = {};
-  if (updates.name) dbPayload.full_name = updates.name;
-  if (updates.phone) dbPayload.phone = updates.phone;
-  
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(dbPayload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+export const updateUserProfile = async (userId: string, updates: Partial<Profile>) => {
+    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+    if (error) throw error;
 };
