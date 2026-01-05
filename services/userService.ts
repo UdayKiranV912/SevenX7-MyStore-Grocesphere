@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { UserState, SavedCard } from '../types';
 
@@ -6,14 +7,12 @@ const MOCK_CARDS: SavedCard[] = [
     { id: 'u1', type: 'UPI', upiId: 'user@okaxis', label: 'Primary UPI' }
 ];
 
-// Helper to map FE roles to BE enum
 const mapRoleToBackend = (role: string): any => {
     if (role === 'store_owner') return 'store';
     if (role === 'delivery_partner') return 'delivery';
     return role;
 };
 
-// Helper to map BE roles to FE
 const mapRoleToFrontend = (role: string): any => {
     if (role === 'store') return 'store_owner';
     if (role === 'delivery') return 'delivery_partner';
@@ -46,6 +45,7 @@ export const registerUser = async (
 
     const backendRole = mapRoleToBackend(role);
 
+    // Initial profile setup - explicit pending status
     const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -54,7 +54,10 @@ export const registerUser = async (
             full_name: fullName,
             phone: phone,
             role: backendRole,
-            approval_status: 'pending'
+            status: 'pending', // Approval Status enum
+            upi_id: upiId,
+            is_active: false,
+            fee_paid_until: new Date(Date.now() + 86400000).toISOString() // 1 day grace for setup
         });
 
     if (profileError) throw profileError;
@@ -67,8 +70,9 @@ export const registerUser = async (
                 name: storeName,
                 address: storeAddress || 'Address Pending',
                 upi_id: upiId,
-                store_type: 'mini_mart', // Default mapping
-                approved: false,
+                store_type: 'mini_mart',
+                approved: false, // Store specific approval
+                status: 'inactive',
                 lat: 12.9716, 
                 lng: 77.5946
             });
@@ -119,8 +123,8 @@ export const loginUser = async (email: string, password: string): Promise<UserSt
         location: null,
         role: mapRoleToFrontend(profileData.role),
         upiId: profileData.upi_id,
-        verification_status: profileData.approval_status === 'approved' ? 'verified' : profileData.approval_status,
-        verificationStatus: profileData.approval_status === 'approved' ? 'verified' : profileData.approval_status
+        verification_status: profileData.status === 'approved' ? 'verified' : profileData.status,
+        verificationStatus: profileData.status === 'approved' ? 'verified' : profileData.status
     };
 };
 

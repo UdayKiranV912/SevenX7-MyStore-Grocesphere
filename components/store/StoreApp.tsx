@@ -5,6 +5,7 @@ import { Profile, Store, Order, InventoryItem, Payout, LiveLocation } from '../.
 import SevenX7Logo from '../SevenX7Logo';
 import { MapVisualizer } from '../MapVisualizer';
 import { fetchOrders, fetchInventory, fetchPayouts, getMyStore, updateOrderStatus, updateInventoryItem, addItemToInventory, getDemoData } from '../../services/storeAdminService';
+import { INITIAL_PRODUCTS } from '../../constants';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -18,7 +19,7 @@ const PREDEFINED_CATEGORIES = [
 ];
 
 export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: boolean}> = ({ user, onLogout, isDemo = false }) => {
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'ORDERS' | 'INVENTORY' | 'PAYMENTS' | 'REPORTS' | 'PROFILE'>('DASHBOARD');
+  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'ORDERS' | 'INVENTORY' | 'PAYMENTS' | 'PROFILE' | 'FEE'>('DASHBOARD');
   const [store, setStore] = useState<Store | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -26,8 +27,9 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
   const [riderLocations, setRiderLocations] = useState<Record<string, LiveLocation>>({});
   const [loading, setLoading] = useState(true);
   
-  // Modals
+  // Inventory Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newItem, setNewItem] = useState<Omit<InventoryItem, 'id' | 'store_id'>>({
     name: '',
     category: 'Mini Mart',
@@ -96,6 +98,14 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
     };
   }, [orders, inventory]);
 
+  const masterSuggestions = useMemo(() => {
+    if (!searchQuery) return [];
+    return INITIAL_PRODUCTS.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        p.category.toLowerCase().includes(searchQuery.toLowerCase())
+    ).slice(0, 5);
+  }, [searchQuery]);
+
   const generateReport = (format: 'PDF' | 'CSV') => {
     if (format === 'CSV') {
       const headers = ['Order ID', 'Date', 'Amount', 'Status', 'Mode'];
@@ -106,85 +116,43 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
       const a = document.createElement('a'); a.href = url; a.download = `Advanced_BI_${store?.name}.csv`; a.click();
     } else {
       const doc = new jsPDF();
-      
-      // Power BI Style Header
-      doc.setFillColor(15, 23, 42); // slate-900
+      doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, 210, 45, 'F');
-      
       doc.setTextColor(255);
       doc.setFontSize(26);
       doc.text(store?.name?.toUpperCase() || 'HUB TERMINAL', 15, 25);
-      
       doc.setFontSize(9);
-      doc.setTextColor(148, 163, 184); // slate-400
-      doc.text(`OPERATIONAL INTELLIGENCE REPORT | CLUSTER NODE: ${store?.id.slice(0, 16)}`, 15, 35);
-      doc.text(`GENERATED AT: ${new Date().toLocaleString()}`, 135, 35);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`OPERATIONAL INTELLIGENCE REPORT | NODE: ${store?.id.slice(0, 8)}`, 15, 35);
+      doc.text(`GENERATED: ${new Date().toLocaleString()}`, 135, 35);
 
-      // KPI Boxes (Simulated boxes)
-      doc.setFillColor(30, 41, 59); // slate-800
+      doc.setFillColor(30, 41, 59);
       doc.roundedRect(15, 50, 45, 25, 3, 3, 'F');
       doc.roundedRect(65, 50, 45, 25, 3, 3, 'F');
       doc.roundedRect(115, 50, 45, 25, 3, 3, 'F');
       doc.roundedRect(165, 50, 30, 25, 3, 3, 'F');
 
-      doc.setFontSize(8);
-      doc.setTextColor(255);
-      doc.text('TOTAL REVENUE', 20, 58);
-      doc.text('ORDER VOLUME', 70, 58);
-      doc.text('AVG ORDER VAL', 120, 58);
-      doc.text('OOS SKUs', 170, 58);
-
+      doc.setFontSize(8); doc.setTextColor(255);
+      doc.text('TOTAL REVENUE', 20, 58); doc.text('ORDER VOLUME', 70, 58); doc.text('AVG ORDER VAL', 120, 58); doc.text('OOS SKUs', 170, 58);
       doc.setFontSize(14);
-      doc.text(`INR ${stats.revenue}`, 20, 68);
-      doc.text(`${stats.total}`, 70, 68);
-      doc.text(`INR ${(stats.revenue/stats.total || 0).toFixed(1)}`, 120, 68);
-      doc.text(`${stats.outOfStock}`, 170, 68);
+      doc.text(`INR ${stats.revenue}`, 20, 68); doc.text(`${stats.total}`, 70, 68); doc.text(`INR ${(stats.revenue/stats.total || 0).toFixed(1)}`, 120, 68); doc.text(`${stats.outOfStock}`, 170, 68);
 
-      // Main Table
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(12);
-      doc.text("TRANSACTION LEDGER", 15, 90);
-      
       autoTable(doc, {
         startY: 95,
-        head: [['Order Ref', 'Timestamp', 'Customer', 'Mode', 'Amount (INR)', 'Status']],
-        body: orders.map(o => [
-          `#${o.id.slice(-6)}`, 
-          new Date(o.created_at).toLocaleDateString(), 
-          o.customer_name || 'N/A', 
-          o.mode.toUpperCase(), 
-          o.total_amount, 
-          o.status.toUpperCase()
-        ]),
+        head: [['Ref', 'Date', 'Customer', 'Mode', 'Amount (INR)', 'Status']],
+        body: orders.map(o => [`#${o.id.slice(-6)}`, new Date(o.created_at).toLocaleDateString(), o.customer_name || 'N/A', o.mode.toUpperCase(), o.total_amount, o.status.toUpperCase()]),
         theme: 'striped',
         headStyles: { fillColor: [15, 23, 42], fontSize: 9 },
-        bodyStyles: { fontSize: 8 },
-        alternateRowStyles: { fillColor: [248, 250, 252] }
+        bodyStyles: { fontSize: 8 }
       });
-
-      // Footer
-      const pageCount = (doc as any).internal.getNumberOfPages();
-      for(let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`Page ${i} of ${pageCount} | SevenX7 Innovations - Secure Node Network`, 15, 285);
-      }
-
-      doc.save(`Advanced_BI_Report_${store?.name}.pdf`);
+      doc.save(`BI_Report_${store?.name}.pdf`);
     }
   };
 
-  const handleUpdateItem = async (itemId: string, field: string, val: string | number | boolean) => {
+  const handleUpdateItem = async (itemId: string, field: string, val: any) => {
     const updated = inventory.map(i => i.id === itemId ? { ...i, [field]: val } : i);
     setInventory(updated);
-    if (!isDemo) {
-      try {
-        await updateInventoryItem(itemId, { [field]: val });
-      } catch (e) {
-        console.error("Update failed", e);
-      }
-    }
+    if (!isDemo) await updateInventoryItem(itemId, { [field]: val });
   };
 
   const handleAddProduct = async () => {
@@ -197,10 +165,15 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
         setInventory([...inventory, added]);
       }
       setIsAddModalOpen(false);
+      setSearchQuery('');
       setNewItem({ name: '', category: 'Mini Mart', emoji: '🏪', mrp: 0, offer_price: 0, stock: 0, active: true });
-    } catch (e) {
-      alert("Failed to add product. Ensure fields are valid.");
-    }
+    } catch (e) { alert("Failed to add product."); }
+  };
+
+  const handleAssignRider = (orderId: string) => {
+    // In a real app, this triggers a lookup for nearest available riders in live_locations
+    // For now, it mocks the assignment
+    updateOrderStatus(orderId, 'on_way');
   };
 
   if (loading) return (
@@ -219,7 +192,7 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
               <h1 className="text-sm font-black text-slate-900 truncate uppercase hidden sm:block">{store?.name}</h1>
           </div>
           <div className="flex items-center gap-4">
-              <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 hidden sm:block">● Operational Live</div>
+              <button onClick={() => setActiveTab('FEE')} className="bg-amber-50 text-amber-600 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-100">License: ₹250/15d</button>
               <button onClick={() => setActiveTab('PROFILE')} className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg active:scale-90 transition-all">👤</button>
           </div>
       </header>
@@ -249,21 +222,21 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
                    <div className="relative z-10 space-y-10">
                         <div>
                            <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] mb-4">Enterprise Insights</p>
-                           <h3 className="text-5xl font-black tracking-tighter leading-none">Hub Visualizer<br/><span className="text-slate-500">BI Analytics Node</span></h3>
+                           <h3 className="text-5xl font-black tracking-tighter leading-none">Intelligence Terminal<br/><span className="text-slate-500">Node Hub Metrics</span></h3>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
                            <button onClick={() => generateReport('PDF')} className="bg-white/10 hover:bg-white/20 p-8 rounded-[2.5rem] border border-white/10 transition-all flex items-center gap-6 group">
                                <span className="text-3xl group-hover:scale-110 transition-transform">📄</span>
                                <div className="text-left">
                                    <p className="text-[11px] font-black uppercase text-white">Power BI Report (PDF)</p>
-                                   <p className="text-[8px] text-white/40 uppercase tracking-widest">Executive Summary</p>
+                                   <p className="text-[8px] text-white/40 uppercase tracking-widest">Analytics Snapshot</p>
                                </div>
                            </button>
                            <button onClick={() => generateReport('CSV')} className="bg-white/10 hover:bg-white/20 p-8 rounded-[2.5rem] border border-white/10 transition-all flex items-center gap-6 group">
                                <span className="text-3xl group-hover:scale-110 transition-transform">📊</span>
                                <div className="text-left">
-                                   <p className="text-[11px] font-black uppercase text-white">Data Lake Export (CSV)</p>
-                                   <p className="text-[8px] text-white/40 uppercase tracking-widest">Raw Data Stream</p>
+                                   <p className="text-[11px] font-black uppercase text-white">Ledger Data (CSV)</p>
+                                   <p className="text-[8px] text-white/40 uppercase tracking-widest">Raw Peer Stream</p>
                                </div>
                            </button>
                         </div>
@@ -276,48 +249,41 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
           <div className="max-w-4xl mx-auto space-y-10 animate-fade-in">
               <div className="flex justify-between items-end px-4">
                   <div>
-                    <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Job Queue</h2>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-3 tracking-[0.2em]">Fulfillment Pipeline</p>
+                    <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Active Queue</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-3 tracking-[0.2em]">Live Fulfillment</p>
                   </div>
               </div>
 
               {orders.length === 0 ? (
-                <div className="py-32 text-center opacity-10 font-black uppercase text-4xl tracking-[0.5em]">No Pending Jobs</div>
+                <div className="py-32 text-center opacity-10 font-black uppercase text-4xl tracking-[0.5em]">No Pending Tasks</div>
               ) : (
                 <div className="space-y-6">
                   {orders.map(order => {
-                    const rider = order.delivery_partner_id ? riderLocations[order.delivery_partner_id] : null;
+                    const rider = riderLocations[order.delivery_partner_id || ''] || null;
                     return (
                       <div key={order.id} className="bg-white border border-slate-100 p-10 rounded-[4rem] shadow-soft-xl space-y-8 hover:shadow-2xl transition-all group">
                           <div className="flex flex-col sm:flex-row justify-between items-start gap-6">
                               <div>
-                                  <h4 className="font-black text-slate-900 text-3xl mb-1">{order.customer_name || 'Anonymous Peer'}</h4>
-                                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em]">Order #{order.id.slice(-6)} • {order.mode.toUpperCase()}</p>
+                                  <h4 className="font-black text-slate-900 text-3xl mb-1">{order.customer_name || 'Anonymous User'}</h4>
+                                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em]">Job #{order.id.slice(-6)} • {order.mode.toUpperCase()}</p>
                               </div>
                               <div className={`px-6 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] border ${order.status === 'placed' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                                   {order.status}
                               </div>
                           </div>
 
-                          {order.mode === 'delivery' && order.status !== 'delivered' && (
-                             <div className="h-64 rounded-[3rem] overflow-hidden border border-slate-100 relative shadow-inner">
-                                 <MapVisualizer
-                                    stores={[]}
-                                    userLat={order.delivery_lat || 12.9716}
-                                    userLng={order.delivery_lng || 77.5946}
-                                    selectedStore={null}
-                                    onSelectStore={() => {}}
-                                    mode="delivery"
-                                    driverLocation={rider ? { lat: rider.lat, lng: rider.lng } : null}
-                                 />
-                                 <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl border border-white">Tracking Link: {rider ? 'LIVE' : 'PENDING'}</div>
-                             </div>
-                          )}
-
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                             {order.status === 'placed' && <button onClick={() => updateOrderStatus(order.id, 'accepted')} className="py-6 bg-emerald-500 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-400 active:scale-95 transition-all">Accept Job</button>}
-                             {order.status === 'accepted' && <button onClick={() => updateOrderStatus(order.id, 'packing')} className="py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-slate-800 active:scale-95 transition-all">Start Packing</button>}
-                             {order.status === 'packing' && <button onClick={() => updateOrderStatus(order.id, order.mode === 'delivery' ? 'ready' : 'delivered')} className="py-6 bg-blue-600 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-500 active:scale-95 transition-all">Mark Ready</button>}
+                             {order.status === 'placed' && <button onClick={() => updateOrderStatus(order.id, 'accepted')} className="py-6 bg-emerald-500 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-400 transition-all">Accept Order</button>}
+                             {order.status === 'accepted' && <button onClick={() => updateOrderStatus(order.id, 'packing')} className="py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-slate-800 transition-all">Start Packing</button>}
+                             {order.status === 'packing' && (
+                                 <div className="contents">
+                                    {order.mode === 'delivery' ? (
+                                        <button onClick={() => handleAssignRider(order.id)} className="py-6 bg-blue-600 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-500 transition-all">Assign Delivery Partner</button>
+                                    ) : (
+                                        <button onClick={() => updateOrderStatus(order.id, 'ready')} className="py-6 bg-blue-600 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-500 transition-all">Mark Ready for Pickup</button>
+                                    )}
+                                 </div>
+                             )}
                           </div>
                       </div>
                     );
@@ -331,7 +297,7 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
           <div className="max-w-6xl mx-auto space-y-12 animate-fade-in">
               <div className="flex justify-between items-center px-4">
                   <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">Catalog Hub</h2>
-                  <button onClick={() => setIsAddModalOpen(true)} className="bg-slate-900 text-white px-10 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all">+ New Catalog Node</button>
+                  <button onClick={() => setIsAddModalOpen(true)} className="bg-slate-900 text-white px-10 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all">+ New Entry</button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -348,32 +314,17 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
                         </div>
                         <div className="grid grid-cols-1 gap-4">
                             <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100">
-                                <p className="text-[10px] font-black text-slate-300 uppercase mb-2 tracking-widest">Live Stock Units</p>
-                                <input 
-                                  type="number" 
-                                  value={item.stock} 
-                                  onChange={(e) => handleUpdateItem(item.id, 'stock', parseInt(e.target.value) || 0)}
-                                  className="w-full bg-transparent text-2xl font-black text-slate-900 border-none outline-none focus:ring-0 p-0"
-                                />
+                                <p className="text-[10px] font-black text-slate-300 uppercase mb-2 tracking-widest">Live Stock</p>
+                                <input type="number" value={item.stock} onChange={(e) => handleUpdateItem(item.id, 'stock', parseInt(e.target.value) || 0)} className="w-full bg-transparent text-2xl font-black text-slate-900 border-none outline-none focus:ring-0 p-0" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
                                     <p className="text-[9px] font-black text-slate-300 uppercase mb-2 tracking-widest">MRP (₹)</p>
-                                    <input 
-                                      type="number" 
-                                      value={item.mrp} 
-                                      onChange={(e) => handleUpdateItem(item.id, 'mrp', parseFloat(e.target.value) || 0)}
-                                      className="w-full bg-transparent text-xl font-black text-slate-900 border-none outline-none focus:ring-0 p-0"
-                                    />
+                                    <input type="number" value={item.mrp} onChange={(e) => handleUpdateItem(item.id, 'mrp', parseFloat(e.target.value) || 0)} className="w-full bg-transparent text-xl font-black text-slate-900 border-none outline-none focus:ring-0 p-0" />
                                 </div>
                                 <div className="bg-emerald-50/50 p-5 rounded-[2rem] border border-emerald-100">
                                     <p className="text-[9px] font-black text-emerald-400 uppercase mb-2 tracking-widest">OFFER (₹)</p>
-                                    <input 
-                                      type="number" 
-                                      value={item.offer_price} 
-                                      onChange={(e) => handleUpdateItem(item.id, 'offer_price', parseFloat(e.target.value) || 0)}
-                                      className="w-full bg-transparent text-xl font-black text-emerald-600 border-none outline-none focus:ring-0 p-0"
-                                    />
+                                    <input type="number" value={item.offer_price} onChange={(e) => handleUpdateItem(item.id, 'offer_price', parseFloat(e.target.value) || 0)} className="w-full bg-transparent text-xl font-black text-emerald-600 border-none outline-none focus:ring-0 p-0" />
                                 </div>
                             </div>
                         </div>
@@ -383,28 +334,24 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
           </div>
         )}
 
-        {activeTab === 'PAYMENTS' && (
-           <div className="max-w-2xl mx-auto space-y-10 animate-fade-in">
-              <h2 className="text-4xl font-black text-slate-900 tracking-tight px-6 leading-none">Settlement Ledger</h2>
-              <div className="space-y-4">
-                 {payouts.length === 0 ? (
-                   <div className="py-32 text-center opacity-10 font-black uppercase text-3xl tracking-[0.5em]">Awaiting Peer Data</div>
-                 ) : payouts.map(p => (
-                   <div key={p.id} className="bg-white border border-slate-100 p-10 rounded-[4rem] shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                        <div className="flex items-center gap-8">
-                            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-[2.5rem] flex items-center justify-center text-3xl font-black shadow-inner">₹</div>
-                            <div>
-                                <h4 className="font-black text-slate-900 text-2xl tracking-tight">₹{p.store_amount.toLocaleString()}</h4>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.transaction_ref || 'PENDING SETTLEMENT'}</p>
-                            </div>
-                        </div>
-                        <span className={`text-[10px] font-black uppercase px-5 py-2.5 rounded-2xl ${p.settled ? 'text-emerald-500 bg-emerald-50 border border-emerald-100' : 'text-amber-500 bg-amber-50 border border-amber-100'}`}>
-                            {p.settled ? 'SETTLED' : 'PROCESSING'}
-                        </span>
-                   </div>
-                 ))}
-              </div>
-           </div>
+        {activeTab === 'FEE' && (
+            <div className="max-w-2xl mx-auto space-y-10 animate-fade-in">
+                 <div className="bg-white p-14 rounded-[5rem] shadow-soft-xl border border-slate-100 text-center">
+                    <div className="w-24 h-24 bg-amber-50 rounded-full flex items-center justify-center text-5xl mx-auto mb-8 animate-bounce-soft">💳</div>
+                    <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-4">Service Licensing</h2>
+                    <p className="text-slate-400 text-sm font-medium leading-relaxed mb-10">Pay the operational fee of ₹250 every 15 days to keep your terminal active in the Grocesphere network.</p>
+                    
+                    <div className="bg-slate-900 p-10 rounded-[3rem] text-white text-left relative overflow-hidden mb-12">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16"></div>
+                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Admin Settlement Node</p>
+                        <p className="text-2xl font-black tracking-tight mb-1">grocesphere.admin@upi</p>
+                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em]">Verify Merchant: SevenX7 Innovations</p>
+                    </div>
+
+                    <button onClick={() => window.open(`upi://pay?pa=grocesphere.admin@upi&pn=SevenX7%20Innovations&am=250&cu=INR`)} className="w-full py-7 bg-emerald-500 text-white rounded-[3rem] font-black uppercase text-[11px] tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Authorize ₹250 Payment</button>
+                    <p className="mt-8 text-[9px] font-bold text-slate-300 uppercase tracking-widest">Automatic sync upon transaction confirmation</p>
+                 </div>
+            </div>
         )}
 
         {activeTab === 'PROFILE' && (
@@ -414,11 +361,11 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
                     {store?.name?.charAt(0)}
                   </div>
                   <h3 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">{store?.name}</h3>
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">Hub Node: {store?.id.slice(0,16)}</p>
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">Node Cluster: {store?.id.slice(0,16)}</p>
                   
                   <div className="mt-14 w-full space-y-4">
                       <div className="bg-slate-50 p-10 rounded-[3rem] border border-slate-100 text-left">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Address Descriptor</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Address descriptor</p>
                           <p className="font-bold text-slate-700 text-lg leading-relaxed">{store?.address}</p>
                       </div>
                       <div className="bg-emerald-50 p-10 rounded-[3rem] border border-emerald-100 text-left flex justify-between items-center">
@@ -440,9 +387,9 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-3xl border-t border-slate-100 px-10 py-6 flex justify-between z-50 max-w-xl mx-auto rounded-t-[4.5rem] shadow-float">
            {[
              { id: 'DASHBOARD', icon: '📊', label: 'Terminal' }, 
-             { id: 'ORDERS', icon: '📦', label: 'Orders' }, 
-             { id: 'INVENTORY', icon: '💎', label: 'Inventory' },
-             { id: 'PAYMENTS', icon: '💸', label: 'Ledger' }
+             { id: 'ORDERS', icon: '📦', label: 'Queue' }, 
+             { id: 'INVENTORY', icon: '💎', label: 'Catalog' },
+             { id: 'PAYMENTS', icon: '💸', label: 'History' }
            ].map(item => (
              <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex flex-col items-center gap-2 transition-all ${activeTab === item.id ? 'text-blue-600 scale-110' : 'text-slate-300'}`}>
                  <div className={`w-14 h-14 rounded-3xl flex items-center justify-center text-3xl transition-all ${activeTab === item.id ? 'bg-slate-900 text-white shadow-xl' : 'bg-transparent text-slate-400'}`}>{item.icon}</div>
@@ -451,88 +398,65 @@ export const StoreApp: React.FC<{user: Profile, onLogout: () => void, isDemo?: b
            ))}
       </nav>
 
-      {/* Add Product Modal */}
+      {/* Improved Add Product Modal with Master Suggestions */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
            <div className="bg-white rounded-[4rem] p-10 w-full max-w-md shadow-2xl animate-scale-in relative overflow-hidden">
                <div className="absolute top-0 left-0 w-full h-2 bg-slate-900"></div>
-               <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-8">New Catalog Node</h3>
+               <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-8">Catalog Sync</h3>
                
                <div className="space-y-5">
-                  <div className="flex gap-4">
-                     <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-4xl shadow-inner border border-slate-100 overflow-hidden">
-                        <input 
-                           type="text" 
-                           value={newItem.emoji} 
-                           onChange={e => setNewItem({...newItem, emoji: e.target.value})} 
-                           className="w-full h-full text-center bg-transparent border-none outline-none focus:ring-0 font-bold"
-                           placeholder="🎁"
-                        />
-                     </div>
-                     <div className="flex-1 space-y-2">
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1">Product Name</p>
-                        <input 
-                           type="text" 
-                           placeholder="Enter item name..." 
-                           value={newItem.name} 
-                           onChange={e => setNewItem({...newItem, name: e.target.value})}
-                           className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none focus:ring-1 focus:ring-slate-900" 
-                        />
-                     </div>
+                  <div className="relative">
+                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1 mb-2">Master Product Search</p>
+                      <input 
+                         type="text" 
+                         placeholder="Search master catalog..." 
+                         value={searchQuery} 
+                         onChange={e => setSearchQuery(e.target.value)}
+                         className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none focus:ring-1 focus:ring-slate-900" 
+                      />
+                      {masterSuggestions.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-[1100]">
+                              {masterSuggestions.map(p => (
+                                  <button key={p.id} onClick={() => { setNewItem({...newItem, name: p.name, emoji: p.emoji, category: p.category, mrp: p.price, offer_price: p.price}); setSearchQuery(''); }} className="w-full p-4 flex items-center gap-4 hover:bg-slate-50 text-left border-b border-slate-50 last:border-none">
+                                      <span className="text-2xl">{p.emoji}</span>
+                                      <div><p className="font-bold text-slate-800 text-sm">{p.name}</p><p className="text-[10px] text-slate-400 uppercase font-black">{p.category}</p></div>
+                                  </button>
+                              ))}
+                          </div>
+                      )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
-                     <div>
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1 mb-2">Category Mapping</p>
-                        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
-                           {PREDEFINED_CATEGORIES.map(cat => (
-                              <button 
-                                 key={cat.label} 
-                                 onClick={() => setNewItem({...newItem, category: cat.label, emoji: cat.emoji})}
-                                 className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase whitespace-nowrap border transition-all ${newItem.category === cat.label ? 'bg-slate-900 text-white border-slate-900 shadow-xl' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
-                              >
-                                 {cat.label}
-                              </button>
-                           ))}
-                        </div>
+                  <div className="flex gap-4">
+                     <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-4xl shadow-inner border border-slate-100">
+                        <input type="text" value={newItem.emoji} onChange={e => setNewItem({...newItem, emoji: e.target.value})} className="w-full text-center bg-transparent border-none outline-none focus:ring-0 font-bold" />
+                     </div>
+                     <div className="flex-1 space-y-2">
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1">Final Display Name</p>
+                        <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" />
                      </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-2">
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1">MRP (₹)</p>
-                        <input 
-                           type="number" 
-                           value={newItem.mrp} 
-                           onChange={e => setNewItem({...newItem, mrp: parseFloat(e.target.value) || 0})}
-                           className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" 
-                        />
+                        <input type="number" value={newItem.mrp} onChange={e => setNewItem({...newItem, mrp: parseFloat(e.target.value) || 0})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" />
                      </div>
                      <div className="space-y-2">
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1">OFFER (₹)</p>
-                        <input 
-                           type="number" 
-                           value={newItem.offer_price} 
-                           onChange={e => setNewItem({...newItem, offer_price: parseFloat(e.target.value) || 0})}
-                           className="w-full bg-emerald-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" 
-                        />
+                        <input type="number" value={newItem.offer_price} onChange={e => setNewItem({...newItem, offer_price: parseFloat(e.target.value) || 0})} className="w-full bg-emerald-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" />
                      </div>
                   </div>
 
                   <div className="space-y-2">
-                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1">Initial Reserve Stock</p>
-                     <input 
-                        type="number" 
-                        value={newItem.stock} 
-                        onChange={e => setNewItem({...newItem, stock: parseInt(e.target.value) || 0})}
-                        className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" 
-                     />
+                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-1">Inventory Reserve</p>
+                     <input type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: parseInt(e.target.value) || 0})} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none" />
                   </div>
                </div>
 
                <div className="flex gap-4 mt-10">
                   <button onClick={() => setIsAddModalOpen(false)} className="flex-1 py-5 bg-slate-100 text-slate-400 rounded-[2rem] font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all">Cancel</button>
-                  <button onClick={handleAddProduct} className="flex-[2] py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-[0.3em] shadow-2xl active:scale-95 transition-all">Provision Item</button>
+                  <button onClick={handleAddProduct} className="flex-[2] py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-[0.3em] shadow-2xl active:scale-95 transition-all">Add to Catalog</button>
                </div>
            </div>
         </div>
